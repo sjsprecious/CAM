@@ -4661,6 +4661,8 @@ end subroutine print_active_fldlst
     ! Shape on disk
     call tape(t)%hlist(f)%field%get_shape(fdims, frank)
 
+    !!write(*,*) "Debug field name=",tape(t)%hlist(f)%field%name
+
     ! Shape of array
     dimind = tape(t)%hlist(f)%field%get_dims()
     call dimind%dim_sizes(adims)

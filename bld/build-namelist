@@ -2942,7 +2942,7 @@ if (!$simple_phys) {
 }
 
 # Macrophysics scheme
-add_default($nl, 'macrop_scheme');
+# add_default($nl, 'macrop_scheme');
 
 # Sub-column switches for physics packages
 # Check that a subcol_scheme is specified if use_subcol_microp is turned on (true)
