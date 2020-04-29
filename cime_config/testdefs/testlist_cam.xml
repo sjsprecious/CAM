@@ -12,6 +12,7 @@
       <machine name="cheyenne" compiler="intel" category="aux_cam"/>
       <machine name="cheyenne" compiler="intel" category="aux_cam_short"/>
       <machine name="cheyenne" compiler="intel" category="aux_cam_one"/>
+      <machine name="cheyenne" compiler="intel" category="aux_pumas"/>
       <machine name="hobart" compiler="nag" category="aux_cam_one"/>
     </machines>
     <options>
@@ -174,6 +175,7 @@
   <test compset="QPC5" grid="f19_f19_mg17" name="ERP_D_Ln9" testmods="cam/outfrq9s">
     <machines>
       <machine name="cheyenne" compiler="intel" category="prebeta"/>
+      <machine name="cheyenne" compiler="intel" category="aux_pumas"/>
     </machines>
     <options>
       <option name="wallclock">00:10:00</option>
@@ -307,6 +309,7 @@
     <machines>
       <machine name="cheyenne" compiler="intel" category="prebeta"/>
       <machine name="cheyenne" compiler="intel" category="aux_cam"/>
+      <machine name="cheyenne" compiler="intel" category="aux_pumas"/>
     </machines>
     <options>
       <option name="wallclock">00:10:00</option>
