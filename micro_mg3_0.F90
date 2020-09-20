@@ -3620,6 +3620,7 @@ subroutine micro_mg_tend ( &
      nrout2 = nrout * precip_frac
      ! The avg_diameter call does the actual calculation; other diameter
      ! outputs are just drout2 times constants.
+     where(nrout .eq. 0._r8) nrout=1.e-34_r8
      drout2 = avg_diameter(qrout, nrout, rho, rhow)
      freqr = precip_frac
 
@@ -3638,6 +3639,7 @@ subroutine micro_mg_tend ( &
      nsout2 = nsout * precip_frac
      ! The avg_diameter call does the actual calculation; other diameter
      ! outputs are just dsout2 times constants.
+     where(nsout .eq. 0._r8) nsout = 1.e-34_r8
      dsout2 = avg_diameter(qsout, nsout, rho, rhosn)
      freqs = precip_frac
 
@@ -3659,6 +3661,7 @@ subroutine micro_mg_tend ( &
      ngout2 = ngout * precip_frac
      ! The avg_diameter call does the actual calculation; other diameter
      ! outputs are just dsout2 times constants.
+     where(ngout .eq. 0._r8) ngout = 1.e-34_r8
      dgout2 = avg_diameter(qgout, ngout, rho, rhogtmp)
      freqg = precip_frac
 
