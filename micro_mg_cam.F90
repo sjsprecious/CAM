@@ -1328,6 +1328,8 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    use tropopause,      only: tropopause_find, TROP_ALG_CPP, TROP_ALG_NONE, NOTFOUND
    use wv_saturation,   only: qsat
 
+   use perf_mod
+
    type(physics_state),         intent(in)    :: state
    type(physics_ptend),         intent(out)   :: ptend
    real(r8),                    intent(in)    :: dtime
@@ -2448,6 +2450,7 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
 
          end select
       case(2:3)
+    call t_startf ('micro_mg3_tend')
          call micro_mg_tend3_0( &
               mgncol,         nlev,           dtime/num_steps,&
               packed_t,               packed_q,               &
@@ -2515,6 +2518,7 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
               packed_tnd_qsnow,packed_tnd_nsnow,packed_re_ice,&
               packed_prer_evap,                                     &
               packed_frzimm,  packed_frzcnt,  packed_frzdep   )
+    call t_stopf ('micro_mg3_tend')
       end select
 
       call handle_errmsg(errstring, subname="micro_mg_tend")
