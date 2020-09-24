@@ -253,6 +253,7 @@ real(r8) :: gamma_2bs_plus2
 interface rising_factorial
    module procedure rising_factorial_r8
    module procedure rising_factorial_integer
+   module procedure rising_factorial_integer_vec
 end interface rising_factorial
 
 interface var_coef
@@ -396,6 +397,37 @@ pure function rising_factorial_integer(x, n) result(res)
   end do
 
 end function rising_factorial_integer
+
+subroutine rising_factorial_integer_vec(x, n, res,vlen)
+  integer, intent(in) :: vlen
+  real(r8), intent(in) :: x(vlen)
+  integer, intent(in) :: n
+  real(r8), intent(out) :: res(vlen)
+
+  integer  :: i,j
+  real(r8) :: factor(vlen)
+
+  res    = 1._r8
+  factor = x
+
+  if (n == 3) then
+    res    = res * factor
+    factor = factor + 1._r8
+    res    = res * factor
+    factor = factor + 1._r8
+    res    = res * factor
+  elseif (n == 2) then
+    res    = res * factor
+    factor = factor + 1._r8
+    res    = res * factor
+  else
+    do i = 1, n
+       res    = res * factor
+       factor = factor + 1._r8
+    enddo
+  endif
+
+end subroutine rising_factorial_integer_vec
 
 ! Calculate correction due to latent heat for evaporation/sublimation
 elemental function calc_ab(t, qv, xxl) result(ab)

@@ -888,23 +888,6 @@ subroutine micro_mg_tend ( &
   real(r8) :: falouts(nlev)
   real(r8) :: faloutns(nlev)
 
-  real(r8) :: faltndc
-  real(r8) :: faltndnc
-  real(r8) :: faltndi
-  real(r8) :: faltndni
-  real(r8) :: faltndqie
-  real(r8) :: faltndqce
-
-  real(r8) :: faltndr
-  real(r8) :: faltndnr
-  real(r8) :: faltnds
-  real(r8) :: faltndns
-
-  real(r8) :: faloutg(nlev)
-  real(r8) :: faloutng(nlev)
-  real(r8) :: faltndg
-  real(r8) :: faltndng
-
   real(r8) :: rainrt(mgncol,nlev)     ! rain rate for reflectivity calculation
 
   ! dummy variables
@@ -917,6 +900,7 @@ subroutine micro_mg_tend ( &
   ! dummies for checking RH
   real(r8) :: qtmp
   real(r8) :: ttmp
+  real(r8) :: qtmpA(mgncol)
   ! dummies for conservation check
   real(r8) :: ratio
   real(r8) :: tmpfrz
@@ -1618,12 +1602,13 @@ subroutine micro_mg_tend ( &
      call size_dist_param_basic(mg_rain_props, qric(:,k), nric(:,k), &
           lamr(:,k), mgncol, n0=n0r(:,k))
 
+     qtmpA = lamr(:,k)**br
      where (lamr(:,k) >= qsmall)
 
         ! provisional rain number and mass weighted mean fallspeed (m/s)
 
-        unr(:,k) = min(arn(:,k)*gamma_br_plus1/lamr(:,k)**br,9.1_r8*rhof(:,k))
-        umr(:,k) = min(arn(:,k)*gamma_br_plus4/(6._r8*lamr(:,k)**br),9.1_r8*rhof(:,k))
+        unr(:,k) = min(arn(:,k)*gamma_br_plus1/qtmpA(:),9.1_r8*rhof(:,k))
+        umr(:,k) = min(arn(:,k)*gamma_br_plus4/(6._r8*qtmpA(:)),9.1_r8*rhof(:,k))
 
      elsewhere
         umr(:,k) = 0._r8
@@ -1636,12 +1621,13 @@ subroutine micro_mg_tend ( &
      call size_dist_param_basic(mg_snow_props, qsic(:,k), nsic(:,k), &
           lams(:,k), mgncol, n0=n0s(:,k))
 
+     qtmpA = lams(:,k)**bs
      where (lams(:,k) > 0._r8)
 
         ! provisional snow number and mass weighted mean fallspeed (m/s)
 
-        ums(:,k) = min(asn(:,k)*gamma_bs_plus4/(6._r8*lams(:,k)**bs),1.2_r8*rhof(:,k))
-        uns(:,k) = min(asn(:,k)*gamma_bs_plus1/lams(:,k)**bs,1.2_r8*rhof(:,k))
+        ums(:,k) = min(asn(:,k)*gamma_bs_plus4/(6._r8*qtmpA(:)),1.2_r8*rhof(:,k))
+        uns(:,k) = min(asn(:,k)*gamma_bs_plus1/qtmpA(:),1.2_r8*rhof(:,k))
 
      elsewhere
         ums(:,k) = 0._r8
@@ -1671,11 +1657,12 @@ subroutine micro_mg_tend ( &
           lamg(:,k), mgncol, n0=n0g(:,k))
      end if
         
+     qtmpA = lamg(:,k)**bgtmp
      where (lamg(:,k) > 0._r8)
 
         ! provisional graupel/hail number and mass weighted mean fallspeed (m/s)
-        umg(:,k) = min(agn(:,k)*gamma(4._r8+bgtmp)/(6._r8*lamg(:,k)**bgtmp),20._r8*rhof(:,k))
-        ung(:,k) = min(agn(:,k)*gamma(1._r8+bgtmp)/lamg(:,k)**bgtmp,20._r8*rhof(:,k))
+        umg(:,k) = min(agn(:,k)*gamma(4._r8+bgtmp)/(6._r8*qtmpA),20._r8*rhof(:,k))
+        ung(:,k) = min(agn(:,k)*gamma(1._r8+bgtmp)/qtmpA,20._r8*rhof(:,k))
 
      elsewhere
         umg(:,k) = 0._r8
@@ -2631,10 +2618,10 @@ subroutine micro_mg_tend ( &
 
      do i=1,mgncol
         if (lamr(i,k).ge.qsmall) then
-
+           qtmp = lamr(i,k)**br
            ! 'final' values of number and mass weighted mean fallspeed for rain (m/s)
-           unr(i,k) = min(arn(i,k)*gamma_br_plus1/lamr(i,k)**br,9.1_r8*rhof(i,k))
-           umr(i,k) = min(arn(i,k)*gamma_br_plus4/(6._r8*lamr(i,k)**br),9.1_r8*rhof(i,k))
+           unr(i,k) = min(arn(i,k)*gamma_br_plus1/qtmp,9.1_r8*rhof(i,k))
+           umr(i,k) = min(arn(i,k)*gamma_br_plus4/(6._r8*qtmp),9.1_r8*rhof(i,k))
 
            fr(i,k) = g*rho(i,k)*umr(i,k)
            fnr(i,k) = g*rho(i,k)*unr(i,k)
@@ -2649,10 +2636,10 @@ subroutine micro_mg_tend ( &
              lams(i,k))
 
         if (lams(i,k).ge.qsmall) then
-
+           qtmp = lams(i,k)**bs
            ! 'final' values of number and mass weighted mean fallspeed for snow (m/s)
-           ums(i,k) = min(asn(i,k)*gamma_bs_plus4/(6._r8*lams(i,k)**bs),1.2_r8*rhof(i,k))
-           uns(i,k) = min(asn(i,k)*gamma_bs_plus1/lams(i,k)**bs,1.2_r8*rhof(i,k))
+           ums(i,k) = min(asn(i,k)*gamma_bs_plus4/(6._r8*qtmp),1.2_r8*rhof(i,k))
+           uns(i,k) = min(asn(i,k)*gamma_bs_plus1/qtmp,1.2_r8*rhof(i,k))
 
            fs(i,k) = g*rho(i,k)*ums(i,k)
            fns(i,k) = g*rho(i,k)*uns(i,k)
@@ -3787,26 +3774,29 @@ subroutine calc_rercld(lamr, n0r, lamc, pgam, qric, qcic, ncic, rercld, mgncol)
   real(r8), dimension(mgncol), intent(inout) :: rercld     ! effective radius calculation for rain + cloud
 
   ! combined size of precip & cloud drops
-  real(r8) :: Atmp
+  real(r8) :: Atmp(mgncol),tmp(mgncol), pgamp1(mgncol)
 
   integer :: i
+
+  pgamp1 = pgam+1._r8
+  call rising_factorial(pgamp1, 2,tmp,mgncol)
 
   do i=1,mgncol
      ! Rain drops
      if (lamr(i) > 0._r8) then
-        Atmp = n0r(i) * pi / (2._r8 * lamr(i)**3._r8)
+        Atmp(i) = n0r(i) * pi / (2._r8 * lamr(i)**3._r8)
      else
-        Atmp = 0._r8
+        Atmp(i) = 0._r8
      end if
 
      ! Add cloud drops
      if (lamc(i) > 0._r8) then
-        Atmp = Atmp + &
-             ncic(i) * pi * rising_factorial(pgam(i)+1._r8, 2)/(4._r8 * lamc(i)**2._r8)
+        Atmp(i) = Atmp(i) + &
+             ncic(i) * pi * tmp(i)/(4._r8 * lamc(i)**2._r8)
      end if
 
-     if (Atmp > 0._r8) then
-        rercld(i) = rercld(i) + 3._r8 *(qric(i) + qcic(i)) / (4._r8 * rhow * Atmp)
+     if (Atmp(i) > 0._r8) then
+        rercld(i) = rercld(i) + 3._r8 *(qric(i) + qcic(i)) / (4._r8 * rhow * Atmp(i))
      end if
   enddo
 end subroutine calc_rercld
