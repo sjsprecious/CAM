@@ -456,7 +456,8 @@ subroutine micro_mg_tend ( &
   use micro_mg_utils, only: &
        size_dist_param_liq, &
        size_dist_param_basic, &
-       avg_diameter
+       avg_diameter, &
+       avg_diameter_vec
 
   ! Microphysical processes.
   use micro_mg_utils, only: &
@@ -3603,14 +3604,16 @@ subroutine micro_mg_tend ( &
   ! reff_rain/reff_snow:
   ! calculate effective radius of rain and snow in microns for COSP using Eq. 9 of COSP v1.3 manual
 
+  ! avoid divide by zero in avg_diameter_vec
+  where(nrout .eq. 0._r8) nrout=1.e-34_r8
+  ! The avg_diameter_vec call does the actual calculation; other diameter
+  ! outputs are just drout2 times constants.
+  call avg_diameter_vec(qrout,nrout,rho,rhow,drout2,mgncol*nlev)
+
   where (qrout .gt. 1.e-7_r8 &
        .and. nrout.gt.0._r8)
      qrout2 = qrout * precip_frac
      nrout2 = nrout * precip_frac
-     ! The avg_diameter call does the actual calculation; other diameter
-     ! outputs are just drout2 times constants.
-     where(nrout .eq. 0._r8) nrout=1.e-34_r8
-     drout2 = avg_diameter(qrout, nrout, rho, rhow)
      freqr = precip_frac
 
      reff_rain=1.5_r8*drout2*1.e6_r8
@@ -3622,14 +3625,16 @@ subroutine micro_mg_tend ( &
      reff_rain = 0._r8
   end where
 
+  ! avoid divide by zero in avg_diameter_vec
+  where(nsout .eq. 0._r8) nsout = 1.e-34_r8
+  ! The avg_diameter_vec call does the actual calculation; other diameter
+  ! outputs are just dsout2 times constants.
+  call avg_diameter_vec(qsout, nsout, rho, rhosn,dsout2,mgncol*nlev)
+
   where (qsout .gt. 1.e-7_r8 &
        .and. nsout.gt.0._r8)
      qsout2 = qsout * precip_frac
      nsout2 = nsout * precip_frac
-     ! The avg_diameter call does the actual calculation; other diameter
-     ! outputs are just dsout2 times constants.
-     where(nsout .eq. 0._r8) nsout = 1.e-34_r8
-     dsout2 = avg_diameter(qsout, nsout, rho, rhosn)
      freqs = precip_frac
 
      dsout=3._r8*rhosn/rhows*dsout2
@@ -3644,14 +3649,16 @@ subroutine micro_mg_tend ( &
      reff_snow=0._r8
   end where
 
+  ! avoid divide by zero in avg_diameter_vec
+  where(ngout .eq. 0._r8) ngout = 1.e-34_r8
+  ! The avg_diameter_vec call does the actual calculation; other diameter
+  ! outputs are just dsout2 times constants.
+  call avg_diameter_vec(qgout, ngout, rho, rhogtmp,dgout2,mgncol*nlev)
+
   where (qgout .gt. 1.e-7_r8 &
        .and. ngout.gt.0._r8)
      qgout2 = qgout * precip_frac
      ngout2 = ngout * precip_frac
-     ! The avg_diameter call does the actual calculation; other diameter
-     ! outputs are just dsout2 times constants.
-     where(ngout .eq. 0._r8) ngout = 1.e-34_r8
-     dgout2 = avg_diameter(qgout, ngout, rho, rhogtmp)
      freqg = precip_frac
 
      dgout=3._r8*rhogtmp/rhows*dgout2

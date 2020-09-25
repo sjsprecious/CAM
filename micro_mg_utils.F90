@@ -72,7 +72,8 @@ public :: &
      graupel_riming_liquid_snow, &
      graupel_rain_riming_snow, &
      graupel_rime_splintering, &
-     evaporate_sublimate_precip_graupel
+     evaporate_sublimate_precip_graupel, &
+     avg_diameter_vec
 
 ! 8 byte real and integer
 integer, parameter, public :: r8 = selected_real_kind(12)
@@ -642,6 +643,24 @@ real(r8) elemental function avg_diameter(q, n, rho_air, rho_sub)
   avg_diameter = (q*rho_air/(pi * rho_sub * n))**(1._r8/3._r8)
 
 end function avg_diameter
+
+subroutine avg_diameter_vec (q, n, rho_air, rho_sub, avg_diameter, vlen)
+   ! Finds the average diameter of particles given their density, and
+   ! mass/number concentrations in the air.
+   ! Assumes that diameter follows an exponential distribution.
+   integer,  intent(in) :: vlen
+   real(r8), intent(in) :: q(vlen)         ! mass mixing ratio
+   real(r8), intent(in) :: n(vlen)         ! number concentration (per volume)
+   real(r8), intent(in) :: rho_air(vlen)   ! local density of the air
+   real(r8), intent(in) :: rho_sub   ! density of the particle substance
+   real(r8), intent(out) :: avg_diameter(vlen)
+   integer :: i
+
+   do i=1,vlen
+      avg_diameter(i) = (q(i)*rho_air(i)/(pi * rho_sub * n(i)))**(1._r8/3._r8)
+   enddo
+
+end subroutine avg_diameter_vec
 
 elemental function var_coef_r8(relvar, a) result(res)
   ! Finds a coefficient for process rates based on the relative variance
