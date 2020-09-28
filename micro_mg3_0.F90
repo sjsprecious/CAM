@@ -457,7 +457,8 @@ subroutine micro_mg_tend ( &
        size_dist_param_liq, &
        size_dist_param_basic, &
        avg_diameter, &
-       avg_diameter_vec
+       avg_diameter_vec, &
+       size_dist_param_liq_vect
 
   ! Microphysical processes.
   use micro_mg_utils, only: &
@@ -1495,7 +1496,7 @@ subroutine micro_mg_tend ( &
      ! cloud liquid
      !-------------------------------------------
 
-     call size_dist_param_liq(mg_liq_props, qcic(1:mgncol,k), ncic(1:mgncol,k),& 
+     call size_dist_param_liq_vect(mg_liq_props, qcic(1:mgncol,k), ncic(1:mgncol,k),& 
           rho(1:mgncol,k), pgam(1:mgncol,k), lamc(1:mgncol,k), mgncol)
 
 
@@ -2547,10 +2548,8 @@ subroutine micro_mg_tend ( &
      call size_dist_param_basic(mg_ice_props, dumi(:,k), dumni(:,k), &
           lami(:,k), mgncol)
 
-     call size_dist_param_liq(mg_liq_props, dumc(:,k), dumnc(:,k), rho(:,k), &
-          pgam(:,k), lamc(:,k), mgncol)
-
   enddo
+  call size_dist_param_liq_vect(mg_liq_props, dumc, dumnc, rho, pgam, lamc, mgncol*nlev)
 
   do k=1,nlev
      do i=1,mgncol
@@ -3449,6 +3448,8 @@ subroutine micro_mg_tend ( &
 
   ! cloud droplet effective radius
   !-----------------------------------------------------------------
+  dum_2D = dumnc
+  call size_dist_param_liq_vect(mg_liq_props, dumc, dumnc, rho, pgam, lamc, mgncol*nlev)
   do k=1,nlev
      do i=1,mgncol
         if (dumc(i,k).ge.qsmall) then
@@ -3465,12 +3466,7 @@ subroutine micro_mg_tend ( &
 
            end if
 
-           dum = dumnc(i,k)
-
-           call size_dist_param_liq(mg_liq_props, dumc(i,k), dumnc(i,k), rho(i,k), &
-                pgam(i,k), lamc(i,k))
-
-           if (dum /= dumnc(i,k)) then
+           if (dum_2D(i,k) /= dumnc(i,k)) then
               ! adjust number conc if needed to keep mean size in reasonable range
               nctend(i,k)=(dumnc(i,k)*lcldm(i,k)-nc(i,k))*rdeltat
            end if
@@ -3488,13 +3484,16 @@ subroutine micro_mg_tend ( &
 
            dumnc(i,k)=1.e8_r8
 
-           ! Pass in "false" adjust flag to prevent number from being changed within
-           ! size distribution subroutine.
-           call size_dist_param_liq(mg_liq_props, dumc(i,k), dumnc(i,k), rho(i,k), &
-                pgam(i,k), lamc(i,k))
+        endif
+     enddo
 
+     ! Pass in "false" adjust flag to prevent number from being changed within
+     ! size distribution subroutine.
+     call size_dist_param_liq_vect(mg_liq_props, dumc(:,k), dumnc(:,k), rho(:,k), pgam(:,k), lamc(:,k), mgncol)
+
+     do i=1,mgncol
+        if (dumc(i,k).ge.qsmall) then
            effc_fn(i,k) = (pgam(i,k)+3._r8)/lamc(i,k)/2._r8*1.e6_r8
-
         else
            effc(i,k) = 10._r8
            lamcrad(i,k)=0._r8

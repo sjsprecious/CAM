@@ -73,7 +73,8 @@ public :: &
      graupel_rain_riming_snow, &
      graupel_rime_splintering, &
      evaporate_sublimate_precip_graupel, &
-     avg_diameter_vec
+     avg_diameter_vec, &
+     size_dist_param_liq_vect
 
 ! 8 byte real and integer
 integer, parameter, public :: r8 = selected_real_kind(12)
@@ -108,11 +109,11 @@ type(MGHydrometeorProps), public :: mg_graupel_props
 type(MGHydrometeorProps), public :: mg_hail_props
 
 interface size_dist_param_liq
-  module procedure size_dist_param_liq_vect
   module procedure size_dist_param_liq_line
 end interface
 interface size_dist_param_basic
   module procedure size_dist_param_basic_vect
+  module procedure size_dist_param_basic_vect2
   module procedure size_dist_param_basic_line
 end interface
 
@@ -253,6 +254,7 @@ real(r8) :: gamma_2bs_plus2
 
 interface rising_factorial
    module procedure rising_factorial_r8
+   module procedure rising_factorial_r8_vec
    module procedure rising_factorial_integer
    module procedure rising_factorial_integer_vec
 end interface rising_factorial
@@ -380,6 +382,20 @@ pure function rising_factorial_r8(x, n) result(res)
 
 end function rising_factorial_r8
 
+subroutine rising_factorial_r8_vec(x, n, res,vlen)
+  integer, intent(in)   :: vlen
+  real(r8), intent(in)  :: x(vlen), n
+  real(r8), intent(out) :: res(vlen)
+  integer :: i
+  real(r8) :: tmp(vlen)
+
+  tmp = x+n
+  res = gamma(tmp)
+  tmp = gamma(x)
+  res = res/tmp
+
+end subroutine rising_factorial_r8_vec
+
 ! Rising factorial can be performed much cheaper if n is a small integer.
 pure function rising_factorial_integer(x, n) result(res)
   real(r8), intent(in) :: x
@@ -496,49 +512,51 @@ end subroutine size_dist_param_liq_line
 
 ! get cloud droplet size distribution parameters
 
-subroutine size_dist_param_liq_vect(props, qcic, ncic, rho, pgam, lamc, mgncol)
+subroutine size_dist_param_liq_vect(props, qcic, ncic, rho, pgam, lamc, vlen)
 
   type(mghydrometeorprops), intent(in) :: props
-  integer,                          intent(in) :: mgncol
-  real(r8), dimension(mgncol), intent(in) :: qcic
-  real(r8), dimension(mgncol), intent(inout) :: ncic
-  real(r8), dimension(mgncol), intent(in) :: rho
-  real(r8), dimension(mgncol), intent(out) :: pgam
-  real(r8), dimension(mgncol), intent(out) :: lamc
-  type(mghydrometeorprops) :: props_loc
-  integer :: i
+  integer,                          intent(in) :: vlen
+  real(r8), dimension(vlen), intent(in) :: qcic
+  real(r8), dimension(vlen), intent(inout) :: ncic
+  real(r8), dimension(vlen), intent(in) :: rho
+  real(r8), dimension(vlen), intent(out) :: pgam
+  real(r8), dimension(vlen), intent(out) :: lamc
+  integer :: i, cnt
+  real(r8) :: tmp(vlen),pgamp1(vlen)
+  real(r8) :: shapeC(vlen),lbnd(vlen),ubnd(vlen)
 
-  do i=1,mgncol
-     if (qcic(i) > qsmall) then
-        ! Local copy of properties that can be modified.
-        ! (Elemental routines that operate on arrays can't modify scalar
-        ! arguments.)
-        props_loc = props
-        ! Get pgam from fit Rotstayn and Liu 2003 (changed from Martin 1994 for CAM6)
-        pgam(i) = 1.0_r8 - 0.7_r8 * exp(-0.008_r8*1.e-6_r8*ncic(i)*rho(i))
-        pgam(i) = 1._r8/(pgam(i)**2) - 1._r8
-        pgam(i) = max(pgam(i), 2._r8)
-     endif
-  enddo
-  do i=1,mgncol
-     if (qcic(i) > qsmall) then
-        ! Set coefficient for use in size_dist_param_basic.
-        ! The 3D case is so common and optimizable that we specialize
-        ! it:
-        if (props_loc%eff_dim == 3._r8) then
-           props_loc%shape_coef = pi / 6._r8 * props_loc%rho * &
-                rising_factorial(pgam(i)+1._r8, 3)
-        else
-           props_loc%shape_coef = pi / 6._r8 * props_loc%rho * &
-                rising_factorial(pgam(i)+1._r8, props_loc%eff_dim)
-        end if
-        ! Limit to between 2 and 50 microns mean size.
-        props_loc%lambda_bounds(1) = (pgam(i)+1._r8)*1._r8/50.e-6_r8
-        props_loc%lambda_bounds(2) = (pgam(i)+1._r8)*1._r8/2.e-6_r8
-        call size_dist_param_basic(props_loc, qcic(i), ncic(i), lamc(i))
-     endif
-  enddo
-  do i=1,mgncol
+  cnt = COUNT(qcic>qsmall)
+  if(cnt>0) then
+    do i=1,vlen
+       if (qcic(i) > qsmall) then
+          ! Get pgam from fit Rotstayn and Liu 2003 (changed from Martin 1994 for CAM6)
+          pgam(i) = 1.0_r8 - 0.7_r8 * exp(-0.008_r8*1.e-6_r8*ncic(i)*rho(i))
+          pgam(i) = 1._r8/(pgam(i)**2) - 1._r8
+          pgam(i) = max(pgam(i), 2._r8)
+          pgamp1(i) = pgam(i)+1._r8
+       endif
+    enddo
+    ! Set coefficient for use in size_dist_param_basic.
+    ! The 3D case is so common and optimizable that we specialize
+    ! it:
+    if (props%eff_dim == 3._r8) then
+       call rising_factorial(pgamp1,3,tmp,vlen)
+    else
+       call rising_factorial(pgamp1, props%eff_dim,tmp,vlen)
+    endif
+
+    do i=1,vlen
+       if (qcic(i) > qsmall) then
+          shapeC(i) = pi / 6._r8 * props%rho * tmp(i)
+          ! Limit to between 2 and 50 microns mean size.
+          lbnd(i)   = pgamp1(i)*1._r8/50.e-6_r8
+          ubnd(i)   = pgamp1(i)*1._r8/2.e-6_r8
+       endif
+    enddo
+    call size_dist_param_basic(props, qcic, ncic, shapeC, lbnd, ubnd, lamc, vlen)
+  endif
+
+  do i=1,vlen
      if (qcic(i) <= qsmall) then
         ! pgam not calculated in this case, so set it to a value likely to
         ! cause an error if it is accidentally used
@@ -630,6 +648,55 @@ subroutine size_dist_param_basic_vect(props, qic, nic, lam, mgncol, n0)
 
 end subroutine size_dist_param_basic_vect
 
+subroutine size_dist_param_basic_vect2(props, qic, nic, shapeC,lbnd,ubnd, lam, vlen, n0)
+
+  type (mghydrometeorprops), intent(in) :: props
+  integer,                          intent(in) :: vlen
+  real(r8), dimension(vlen), intent(in) :: qic
+  real(r8), dimension(vlen), intent(inout) :: nic
+  real(r8), dimension(vlen), intent(in) :: shapeC,lbnd,ubnd
+  real(r8), dimension(vlen), intent(out) :: lam
+  real(r8), dimension(vlen), intent(out), optional :: n0
+  integer  :: i
+  integer  :: cnt
+  logical  :: limiterActive
+  real(r8) :: effDim,shapeCoef, minMass
+  limiterActive = limiter_is_on(props%min_mean_mass)
+  effDim        = props%eff_dim
+  minMass       = props%min_mean_mass
+
+  do i=1,vlen
+
+     if (qic(i) > qsmall) then
+        ! add upper limit to in-cloud number concentration to prevent
+        ! numerical error
+
+        if (limiterActive) then
+           nic(i) = min(nic(i), qic(i) / minMass)
+        end if
+        ! lambda = (c n/q)^(1/d)
+
+        lam(i) = (shapeC(i) * nic(i)/qic(i))**(1._r8/effDim)
+        ! check for slope
+        ! adjust vars
+
+        if (lam(i) < lbnd(i)) then
+           lam(i) = lbnd(i)
+           nic(i) = lam(i)**(effDim) * qic(i)/shapeC(i)
+        else if (lam(i) > ubnd(i)) then
+           lam(i) = ubnd(i)
+           nic(i) = lam(i)**(effDim) * qic(i)/shapeC(i)
+        end if
+
+     else
+        lam(i) = 0._r8
+     end if
+
+  enddo
+
+  if (present(n0)) n0 = nic * lam
+
+end subroutine size_dist_param_basic_vect2
 
 real(r8) elemental function avg_diameter(q, n, rho_air, rho_sub)
   ! Finds the average diameter of particles given their density, and
