@@ -458,7 +458,8 @@ subroutine micro_mg_tend ( &
        size_dist_param_basic, &
        avg_diameter, &
        avg_diameter_vec, &
-       size_dist_param_liq_vect
+       size_dist_param_liq_vect, &
+       size_dist_param_basic_vect
 
   ! Microphysical processes.
   use micro_mg_utils, only: &
@@ -897,8 +898,8 @@ subroutine micro_mg_tend ( &
   real(r8) :: dum1
   real(r8) :: dum2
   real(r8) :: dum3
-  real(r8) :: dumni0
-  real(r8) :: dumns0
+  real(r8) :: dumni0, dumni0A2D(mgncol,nlev)
+  real(r8) :: dumns0, dumns0A2D(mgncol,nlev)
   ! dummies for checking RH
   real(r8) :: qtmp
   real(r8) :: ttmp
@@ -1533,7 +1534,7 @@ subroutine micro_mg_tend ( &
 
      ! Get size distribution parameters for cloud ice
 
-     call size_dist_param_basic(mg_ice_props, qiic(:,k), niic(:,k), &
+     call size_dist_param_basic_vect(mg_ice_props, qiic(:,k), niic(:,k), &
           lami(:,k), mgncol, n0=n0i(:,k))
 	  
      ! Alternative autoconversion 
@@ -1601,7 +1602,7 @@ subroutine micro_mg_tend ( &
      !......................................................................
      ! rain
 
-     call size_dist_param_basic(mg_rain_props, qric(:,k), nric(:,k), &
+     call size_dist_param_basic_vect(mg_rain_props, qric(:,k), nric(:,k), &
           lamr(:,k), mgncol, n0=n0r(:,k))
 
      qtmpA = lamr(:,k)**br
@@ -1620,7 +1621,7 @@ subroutine micro_mg_tend ( &
      !......................................................................
      ! snow
 
-     call size_dist_param_basic(mg_snow_props, qsic(:,k), nsic(:,k), &
+     call size_dist_param_basic_vect(mg_snow_props, qsic(:,k), nsic(:,k), &
           lams(:,k), mgncol, n0=n0s(:,k))
 
      qtmpA = lams(:,k)**bs
@@ -1651,11 +1652,11 @@ subroutine micro_mg_tend ( &
      !  graupel/hail size distributions and properties
 
      if (do_hail) then
-        call size_dist_param_basic(mg_hail_props, qgic(:,k), ngic(:,k), &
+        call size_dist_param_basic_vect(mg_hail_props, qgic(:,k), ngic(:,k), &
           lamg(:,k), mgncol, n0=n0g(:,k))
      end if
      if (do_graupel) then
-        call size_dist_param_basic(mg_graupel_props, qgic(:,k), ngic(:,k), &
+        call size_dist_param_basic_vect(mg_graupel_props, qgic(:,k), ngic(:,k), &
           lamg(:,k), mgncol, n0=n0g(:,k))
      end if
         
@@ -2438,9 +2439,8 @@ subroutine micro_mg_tend ( &
   ! divide by precip fraction to get in-precip (local) values of
   ! rain mass and number, divide by rhow to get rain number in kg^-1
 
+  call size_dist_param_basic_vect(mg_rain_props, qric, nric, lamr, mgncol*nlev, n0=n0r)
   do k=1,nlev
-
-     call size_dist_param_basic(mg_rain_props, qric(:,k), nric(:,k), lamr(:,k), mgncol, n0=n0r(:,k))
 
      ! Calculate rercld
 
@@ -2542,13 +2542,8 @@ subroutine micro_mg_tend ( &
      enddo
   enddo
 
-  do k=1,nlev
-
-     ! obtain new slope parameter to avoid possible singularity
-     call size_dist_param_basic(mg_ice_props, dumi(:,k), dumni(:,k), &
-          lami(:,k), mgncol)
-
-  enddo
+  ! obtain new slope parameter to avoid possible singularity
+  call size_dist_param_basic_vect(mg_ice_props, dumi, dumni, lami, mgncol*nlev)
   call size_dist_param_liq_vect(mg_liq_props, dumc, dumnc, rho, pgam, lamc, mgncol*nlev)
 
   do k=1,nlev
@@ -2607,12 +2602,17 @@ subroutine micro_mg_tend ( &
 
   enddo
 
-  do k=1,nlev
-
-        ! fallspeed for rain
-        call size_dist_param_basic(mg_rain_props, dumr(:,k), dumnr(:,k), &
-             lamr(:,k), mgncol)
-  enddo
+  ! fallspeed for rain
+  call size_dist_param_basic_vect(mg_rain_props, dumr, dumnr, lamr, mgncol*nlev)
+  ! fallspeed for snow
+  call size_dist_param_basic_vect(mg_snow_props, dums, dumns, lams, mgncol*nlev)
+  ! fallspeed for graupel
+  if (do_hail) then
+     call size_dist_param_basic_vect(mg_hail_props, dumg, dumng, lamg, mgncol*nlev)
+  end if
+  if (do_graupel) then
+     call size_dist_param_basic_vect(mg_graupel_props, dumg, dumng, lamg, mgncol*nlev)
+  end if
 
   do k=1,nlev
 
@@ -2631,10 +2631,6 @@ subroutine micro_mg_tend ( &
            fnr(i,k)=0._r8
         end if
 
-        ! fallspeed for snow
-        call size_dist_param_basic(mg_snow_props, dums(i,k), dumns(i,k), &
-             lams(i,k))
-
         if (lams(i,k).ge.qsmall) then
            qtmp = lams(i,k)**bs
            ! 'final' values of number and mass weighted mean fallspeed for snow (m/s)
@@ -2649,17 +2645,6 @@ subroutine micro_mg_tend ( &
            fns(i,k)=0._r8
         end if
 
-        ! fallspeed for graupel
-
-        if (do_hail) then
-           call size_dist_param_basic(mg_hail_props, dumg(i,k), dumng(i,k), &
-             lamg(i,k))
-        end if
-        if (do_graupel) then
-           call size_dist_param_basic(mg_graupel_props, dumg(i,k), dumng(i,k), &
-             lamg(i,k))
-        end if
-            
         if (lamg(i,k).ge.qsmall) then
 
            ! 'final' values of number and mass weighted mean fallspeed for graupel (m/s)
@@ -3185,6 +3170,11 @@ subroutine micro_mg_tend ( &
      enddo
   enddo
 
+  ! get mean size of rain = 1/lamr, add frozen rain to either snow or cloud ice
+  ! depending on mean rain size
+  ! add to graupel if using that option....
+  call size_dist_param_basic_vect(mg_rain_props, dumr, dumnr, lamr, mgncol*nlev)
+
    do k=1,nlev
       do i=1,mgncol
 
@@ -3207,13 +3197,6 @@ subroutine micro_mg_tend ( &
 
               qrtend(i,k)=qrtend(i,k)-dum*dumr(i,k)*rdeltat
               nrtend(i,k)=nrtend(i,k)-dum*dumnr(i,k)*rdeltat
-
-              ! get mean size of rain = 1/lamr, add frozen rain to either snow or cloud ice
-              ! depending on mean rain size
-              ! add to graupel if using that option....
-
-              call size_dist_param_basic(mg_rain_props, dumr(i,k), dumnr(i,k), &
-                   lamr(i,k))
 
               if (lamr(i,k) < 1._r8/Dcs) then
 
@@ -3409,21 +3392,20 @@ subroutine micro_mg_tend ( &
   !-----------------------------------------------------------------
 
   if (do_cldice) then
+     dum_2D = dumni
+     call size_dist_param_basic_vect(mg_ice_props, dumi, dumni, lami, mgncol*nlev, n0=dumni0A2D)
+
      do k=1,nlev
         do i=1,mgncol
            if (dumi(i,k).ge.qsmall) then
 
-              dum_2D(i,k) = dumni(i,k)
-              call size_dist_param_basic(mg_ice_props, dumi(i,k), dumni(i,k), &
-                   lami(i,k), dumni0)
-
-              if (dumni(i,k) /=dum_2D(i,k)) then
+              if (dumni(i,k) /= dum_2D(i,k)) then
                  ! adjust number conc if needed to keep mean size in reasonable range
                  nitend(i,k)=(dumni(i,k)*icldm(i,k)-ni(i,k))*rdeltat
               end if
 
               effi(i,k) = 1.5_r8/lami(i,k)*1.e6_r8
-              sadice(i,k) = 2._r8*pi*(lami(i,k)**(-3))*dumni0*rho(i,k)*1.e-2_r8  ! m2/m3 -> cm2/cm3
+              sadice(i,k) = 2._r8*pi*(lami(i,k)**(-3))*dumni0A2D(i,k)*rho(i,k)*1.e-2_r8  ! m2/m3 -> cm2/cm3
 
            else
               effi(i,k) = 25._r8
@@ -3450,6 +3432,7 @@ subroutine micro_mg_tend ( &
   !-----------------------------------------------------------------
   dum_2D = dumnc
   call size_dist_param_liq_vect(mg_liq_props, dumc, dumnc, rho, pgam, lamc, mgncol*nlev)
+
   do k=1,nlev
      do i=1,mgncol
         if (dumc(i,k).ge.qsmall) then
@@ -3505,17 +3488,15 @@ subroutine micro_mg_tend ( &
 
   ! recalculate 'final' rain size distribution parameters
   ! to ensure that rain size is in bounds, adjust rain number if needed
+  dum_2D = dumnr
+  call size_dist_param_basic_vect(mg_rain_props, dumr, dumnr, lamr, mgncol*nlev)
+
   do k=1,nlev
      do i=1,mgncol
 
         if (dumr(i,k).ge.qsmall) then
 
-           dum = dumnr(i,k)
-
-           call size_dist_param_basic(mg_rain_props, dumr(i,k), dumnr(i,k), &
-                lamr(i,k))
-
-           if (dum /= dumnr(i,k)) then
+           if (dum_2D(i,k) /= dumnr(i,k)) then
               ! adjust number conc if needed to keep mean size in reasonable range
               nrtend(i,k)=(dumnr(i,k)*precip_frac(i,k)-nr(i,k))*rdeltat
            end if
@@ -3526,21 +3507,19 @@ subroutine micro_mg_tend ( &
 
   ! recalculate 'final' snow size distribution parameters
   ! to ensure that snow size is in bounds, adjust snow number if needed
+  dum_2D = dumns
+  call size_dist_param_basic_vect(mg_snow_props, dums, dumns, lams, mgncol*nlev, n0=dumns0A2D)
+
   do k=1,nlev
      do i=1,mgncol
         if (dums(i,k).ge.qsmall) then
 
-           dum = dumns(i,k)
-
-           call size_dist_param_basic(mg_snow_props, dums(i,k), dumns(i,k), &
-                lams(i,k), n0=dumns0)
-
-           if (dum /= dumns(i,k)) then
+           if (dum_2D(i,k) /= dumns(i,k)) then
               ! adjust number conc if needed to keep mean size in reasonable range
               nstend(i,k)=(dumns(i,k)*precip_frac(i,k)-ns(i,k))*rdeltat
            end if
 
-           sadsnow(i,k) = 2._r8*pi*(lams(i,k)**(-3))*dumns0*rho(i,k)*1.e-2_r8  ! m2/m3 -> cm2/cm3
+           sadsnow(i,k) = 2._r8*pi*(lams(i,k)**(-3))*dumns0A2D(i,k)*rho(i,k)*1.e-2_r8  ! m2/m3 -> cm2/cm3
 
         end if
      end do ! vertical k loop
@@ -3548,23 +3527,20 @@ subroutine micro_mg_tend ( &
 
   ! recalculate 'final' graupel size distribution parameters
   ! to ensure that  size is in bounds, addjust number if needed
+  dum_2D = dumng
+  if (do_hail) then
+     call size_dist_param_basic_vect(mg_hail_props, dumg, dumng, lamg, mgncol*nlev)
+  end if
+  if (do_graupel) then
+     call size_dist_param_basic_vect(mg_graupel_props, dumg, dumng, lamg, mgncol*nlev)
+  end if
+
   do k=1,nlev
      do i=1,mgncol
 
         if (dumg(i,k).ge.qsmall) then
 
-           dum = dumng(i,k)
-
-           if (do_hail) then
-              call size_dist_param_basic(mg_hail_props, dumg(i,k), dumng(i,k), &
-                lamg(i,k))
-           end if
-           if (do_graupel) then
-              call size_dist_param_basic(mg_graupel_props, dumg(i,k), dumng(i,k), &
-                lamg(i,k))
-           end if
-              
-           if (dum /= dumng(i,k)) then
+           if (dum_2D(i,k) /= dumng(i,k)) then
               ! adjust number conc if needed to keep mean size in reasonable range
               ngtend(i,k)=(dumng(i,k)*precip_frac(i,k)-ng(i,k))*rdeltat
            end if

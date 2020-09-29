@@ -74,7 +74,8 @@ public :: &
      graupel_rime_splintering, &
      evaporate_sublimate_precip_graupel, &
      avg_diameter_vec, &
-     size_dist_param_liq_vect
+     size_dist_param_liq_vect, & 
+     size_dist_param_basic_vect
 
 ! 8 byte real and integer
 integer, parameter, public :: r8 = selected_real_kind(12)
@@ -112,7 +113,6 @@ interface size_dist_param_liq
   module procedure size_dist_param_liq_line
 end interface
 interface size_dist_param_basic
-  module procedure size_dist_param_basic_vect
   module procedure size_dist_param_basic_vect2
   module procedure size_dist_param_basic_line
 end interface
@@ -606,36 +606,46 @@ elemental subroutine size_dist_param_basic_line(props, qic, nic, lam, n0)
 
 end subroutine size_dist_param_basic_line
 
-subroutine size_dist_param_basic_vect(props, qic, nic, lam, mgncol, n0)
+subroutine size_dist_param_basic_vect(props, qic, nic, lam, vlen, n0)
 
-  type (mghydrometeorprops), intent(in) :: props
-  integer,                          intent(in) :: mgncol
-  real(r8), dimension(mgncol), intent(in) :: qic
-  real(r8), dimension(mgncol), intent(inout) :: nic
-  real(r8), dimension(mgncol), intent(out) :: lam
-  real(r8), dimension(mgncol), intent(out), optional :: n0
+  type (mghydrometeorprops),   intent(in)  :: props
+  integer,                     intent(in)  :: vlen
+  real(r8), dimension(vlen), intent(in)    :: qic
+  real(r8), dimension(vlen), intent(inout) :: nic
+  real(r8), dimension(vlen), intent(out)   :: lam
+  real(r8), dimension(vlen), intent(out), optional :: n0
   integer :: i
-  do i=1,mgncol
+  logical :: limiterActive
+  real(r8) :: effDim,shapeCoef,ubnd,lbnd, minMass
+
+  limiterActive = limiter_is_on(props%min_mean_mass)
+  effDim    = props%eff_dim
+  shapeCoef = props%shape_coef
+  lbnd      = props%lambda_bounds(1)
+  ubnd      = props%lambda_bounds(2)
+  minMass   = props%min_mean_mass
+
+  do i=1,vlen
 
      if (qic(i) > qsmall) then
 
         ! add upper limit to in-cloud number concentration to prevent
         ! numerical error
-        if (limiter_is_on(props%min_mean_mass)) then
-           nic(i) = min(nic(i), qic(i) / props%min_mean_mass)
+        if (limiterActive) then
+           nic(i) = min(nic(i), qic(i) / minMass)
         end if
 
         ! lambda = (c n/q)^(1/d)
-        lam(i) = (props%shape_coef * nic(i)/qic(i))**(1._r8/props%eff_dim)
+        lam(i) = (shapeCoef * nic(i)/qic(i))**(1._r8/effDim)
 
         ! check for slope
         ! adjust vars
-        if (lam(i) < props%lambda_bounds(1)) then
-           lam(i) = props%lambda_bounds(1)
-           nic(i) = lam(i)**(props%eff_dim) * qic(i)/props%shape_coef
-        else if (lam(i) > props%lambda_bounds(2)) then
-           lam(i) = props%lambda_bounds(2)
-           nic(i) = lam(i)**(props%eff_dim) * qic(i)/props%shape_coef
+        if (lam(i) < lbnd) then
+           lam(i) = lbnd
+           nic(i) = lam(i)**(effDim) * qic(i)/shapeCoef
+        else if (lam(i) > ubnd) then
+           lam(i) = ubnd
+           nic(i) = lam(i)**(effDim) * qic(i)/shapeCoef
         end if
 
      else
