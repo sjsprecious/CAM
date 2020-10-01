@@ -179,6 +179,9 @@ real(r8), parameter :: csmax = 26._r8
 real(r8), parameter :: mindbz = -99._r8
 real(r8), parameter :: minrefl = 1.26e-10_r8    ! minrefl = 10._r8**(mindbz/10._r8)
 
+integer, parameter ::   MG_PRECIP_FRAC_INCLOUD = 101
+integer, parameter ::   MG_PRECIP_FRAC_OVERLAP = 102
+
 ! autoconversion size threshold for cloud ice to snow (m)
 real(r8) :: dcs
 
@@ -930,6 +933,7 @@ subroutine micro_mg_tend ( &
   ! number of sub-steps for loops over "n" (for sedimentation)
   integer nstep
   integer mdust
+  integer :: precip_frac_method
 
   ! Varaibles to scale fall velocity between small and regular ice regimes.
   real(r8) :: irad
@@ -1464,9 +1468,15 @@ subroutine micro_mg_tend ( &
 
   precip_frac = cldm
 
+  if (trim(micro_mg_precip_frac_method) == 'in_cloud') then
+     precip_frac_method =  MG_PRECIP_FRAC_INCLOUD
+  else if(trim(micro_mg_precip_frac_method) == 'max_overlap') then
+     precip_frac_method = MG_PRECIP_FRAC_OVERLAP
+  endif
+
   micro_vert_loop: do k=1,nlev
 
-     if (trim(micro_mg_precip_frac_method) == 'in_cloud') then
+     if (precip_frac_method == MG_PRECIP_FRAC_INCLOUD) then
 
         if (k /= 1) then
            where (qc(:,k) < qsmall .and. qi(:,k) < qsmall)
@@ -1474,7 +1484,7 @@ subroutine micro_mg_tend ( &
            end where
         endif
 
-     else if (trim(micro_mg_precip_frac_method) == 'max_overlap') then
+     else if (precip_frac_method ==  MG_PRECIP_FRAC_OVERLAP) then
 
         ! calculate precip fraction based on maximum overlap assumption
 
@@ -3654,8 +3664,8 @@ subroutine micro_mg_tend ( &
   ! *****note: radar reflectivity is local (in-precip average)
   ! units of mm^6/m^3
 
-  do i = 1,mgncol
-     do k=1,nlev
+  do k=1,nlev
+     do i = 1,mgncol
         if (qc(i,k).ge.qsmall .and. (nc(i,k)+nctend(i,k)*deltat).gt.10._r8) then
            dum=(qc(i,k)/lcldm(i,k)*rho(i,k)*1000._r8)**2 &
                 /(0.109_r8*(nc(i,k)+nctend(i,k)*deltat)/lcldm(i,k)*rho(i,k)/1.e6_r8)*lcldm(i,k)/precip_frac(i,k)

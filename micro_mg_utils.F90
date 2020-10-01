@@ -261,7 +261,9 @@ end interface rising_factorial
 
 interface var_coef
    module procedure var_coef_r8
+   module procedure var_coef_r8_vect
    module procedure var_coef_integer
+   module procedure var_coef_integer_vect
 end interface var_coef
 
 !==========================================================================
@@ -460,6 +462,24 @@ elemental function calc_ab(t, qv, xxl) result(ab)
   ab = 1._r8 + dqsdt*xxl/cpp
 
 end function calc_ab
+
+! Calculate correction due to latent heat for evaporation/sublimation
+subroutine calc_ab_vect(t, qv, xxl, ab, vlen)
+  integer,  intent(in) :: vlen
+  real(r8), intent(in) :: t(vlen)     ! Temperature
+  real(r8), intent(in) :: qv(vlen)    ! Saturation vapor pressure
+  real(r8), intent(in) :: xxl         ! Latent heat
+
+  real(r8), intent(out) :: ab(vlen)
+  real(r8) :: dqsdt(vlen)
+  integer :: i
+
+  do i=1,vlen
+     dqsdt(i) = xxl*qv(i) / (rv * t(i)**2)
+     ab(i) = 1._r8 + dqsdt(i)*xxl/cpp
+  enddo
+
+end subroutine calc_ab_vect
 
 ! get cloud droplet size distribution parameters
 elemental subroutine size_dist_param_liq_line(props, qcic, ncic, rho, pgam, lamc)
@@ -750,6 +770,23 @@ elemental function var_coef_r8(relvar, a) result(res)
 
 end function var_coef_r8
 
+subroutine var_coef_r8_vect(relvar, a, res, vlen)
+  ! Finds a coefficient for process rates based on the relative variance
+  ! of cloud water.
+  integer :: vlen
+  real(r8), intent(in) :: relvar(vlen)
+  real(r8), intent(in) :: a
+  real(r8), intent(out) :: res(vlen)
+  integer :: i
+  real(r8) :: tmpA(vlen)
+
+   call rising_factorial(relvar,a,tmpA,vlen)
+   do i=1,vlen
+      res(i) = tmpA(i)/relvar(i)**a
+   enddo
+
+end subroutine var_coef_r8_vect
+
 elemental function var_coef_integer(relvar, a) result(res)
   ! Finds a coefficient for process rates based on the relative variance
   ! of cloud water.
@@ -760,6 +797,23 @@ elemental function var_coef_integer(relvar, a) result(res)
   res = rising_factorial(relvar, a) / relvar**a
 
 end function var_coef_integer
+
+subroutine var_coef_integer_vect(relvar, a, res, vlen)
+  ! Finds a coefficient for process rates based on the relative variance
+  ! of cloud water.
+  integer, intent(in)   :: vlen
+  real(r8), intent(in)  :: relvar(vlen)
+  integer, intent(in)   :: a
+  real(r8), intent(out) :: res(vlen)
+  integer  :: i
+  real(r8) :: tmp(vlen)
+
+  call rising_factorial(relvar, a,tmp,vlen)
+  do i=1,vlen
+     res(i) = tmp(i) / relvar(i)**a
+  enddo
+
+end subroutine var_coef_integer_vect
 
 !========================================================================
 !MICROPHYSICAL PROCESS CALCULATIONS
@@ -794,31 +848,32 @@ subroutine ice_deposition_sublimation(t, qv, qi, ni, &
 
   !INTERNAL VARS:
   !===============================================
-  real(r8) :: ab
+  real(r8) :: ab(mgncol)
   real(r8) :: epsi
-  real(r8) :: qiic
-  real(r8) :: niic
-  real(r8) :: lami
-  real(r8) :: n0i
+  real(r8) :: qiic(mgncol)
+  real(r8) :: niic(mgncol)
+  real(r8) :: lami(mgncol)
+  real(r8) :: n0i(mgncol)
   integer :: i
+
+  !GET IN-CLOUD qi, ni
+  !===============================================
+  qiic = qi/icldm
+  niic = ni/icldm
+
+  !Compute linearized condensational heating correction
+  call calc_ab_vect(t, qvi, xxls, ab, mgncol)
+  !Get slope and intercept of gamma distn for ice.
+  call size_dist_param_basic_vect(mg_ice_props, qiic, niic, lami, mgncol, n0i)
 
   do i=1,mgncol
      if (qi(i)>=qsmall) then
 
-        !GET IN-CLOUD qi, ni
-        !===============================================
-        qiic = qi(i)/icldm(i)
-        niic = ni(i)/icldm(i)
-
-        !Compute linearized condensational heating correction
-        ab=calc_ab(t(i), qvi(i), xxls)
-        !Get slope and intercept of gamma distn for ice.
-        call size_dist_param_basic(mg_ice_props, qiic, niic, lami, n0i)
         !Get depletion timescale=1/eps
-        epsi = 2._r8*pi*n0i*rho(i)*Dv(i)/(lami*lami)
+        epsi = 2._r8*pi*n0i(i)*rho(i)*Dv(i)/(lami(i)*lami(i))
 
         !Compute deposition/sublimation
-        vap_dep(i) = epsi/ab*(qv(i) - qvi(i))
+        vap_dep(i) = epsi/ab(i)*(qv(i) - qvi(i))
 
         !Make this a grid-averaged quantity
         vap_dep(i)=vap_dep(i)*icldm(i)
@@ -836,7 +891,7 @@ subroutine ice_deposition_sublimation(t, qv, qi, ni, &
         if (t(i) < tmelt) then
 
            !Compute bergeron rate assuming cloud for whole step.
-           berg(i) = max(epsi/ab*(qvl(i) - qvi(i)), 0._r8)
+           berg(i) = max(epsi/ab(i)*(qvl(i) - qvi(i)), 0._r8)
         else !T>frz
            berg(i)=0._r8
         end if !T<frz
@@ -875,7 +930,7 @@ subroutine kk2000_liq_autoconversion(microp_uniform, qcic, &
 
   ! Take variance into account, or use uniform value.
   if (.not. microp_uniform) then
-     prc_coef(:) = var_coef(relvar(:), 2.47_r8)
+     call var_coef(relvar, 2.47_r8, prc_coef,mgncol)
   else
      prc_coef(:) = 1._r8
   end if
@@ -944,8 +999,6 @@ subroutine sb2001v2_liq_autoconversion(pgam,qc,nc,qr,rho,relvar,au,nprc,nprc1,mg
   integer :: dumi, i
 
   do i=1,mgncol
-
-    pra_coef = var_coef(relvar(i), 2.47_r8)
 
      if (qc(i) > qsmall) then
        dumi=int(pgam(i))
@@ -1098,23 +1151,28 @@ subroutine immersion_freezing(microp_uniform, t, pgam, lamc, &
   ! Coefficients that will be omitted for sub-columns
   real(r8), dimension(mgncol) :: dum
   integer :: i
+  real(r8) :: tmp1(mgncol), tmp2(mgncol)
 
   if (.not. microp_uniform) then
-     dum(:) = var_coef(relvar, 2)
+     call var_coef(relvar, 2, dum, mgncol)
   else
-     dum(:) = 1._r8
+     dum = 1._r8
   end if
+
+  call rising_factorial(pgam+1._r8, 3, tmp1, mgncol)
+  call rising_factorial(pgam+4._r8, 3, tmp2, mgncol)
+
   do i=1,mgncol
 
      if (qcic(i) >= qsmall .and. t(i) < 269.15_r8) then
 
         nnuccc(i) = &
-             pi/6._r8*ncic(i)*rising_factorial(pgam(i)+1._r8, 3)* &
+             pi/6._r8*ncic(i)*tmp1(i)* &
              bimm*(exp(aimm*(tmelt - t(i)))-1._r8)/lamc(i)**3
 
         mnuccc(i) = dum(i) * nnuccc(i) * &
              pi/6._r8*rhow* &
-             rising_factorial(pgam(i)+4._r8, 3)/lamc(i)**3
+             tmp2(i)/lamc(i)**3
 
      else
         mnuccc(i) = 0._r8
@@ -1165,23 +1223,23 @@ subroutine contact_freezing (microp_uniform, t, p, rndst, nacon, &
   real(r8) :: ndfaer(size(rndst,2)) ! aerosol diffusivities (m^2/sec)
 
   ! Coefficients not used for subcolumns
-  real(r8) :: dum, dum1
+  real(r8) :: dum(mgncol), dum1(mgncol)
 
   ! Common factor between mass and number.
   real(r8) :: contact_factor
 
   integer  :: i
 
+  call var_coef(relvar, 4._r8/3._r8, dum, mgncol)
+  call var_coef(relvar, 1._r8/3._r8, dum1, mgncol)
+
   do i = 1,mgncol
 
      if (qcic(i) >= qsmall .and. t(i) < 269.15_r8) then
 
-        if (.not. microp_uniform) then
-           dum = var_coef(relvar(i), 4._r8/3._r8)
-           dum1 = var_coef(relvar(i), 1._r8/3._r8)
-        else
-           dum = 1._r8
-           dum1 = 1._r8
+        if (microp_uniform) then
+           dum(:)  = 1._r8
+           dum1(:) = 1._r8
         endif
 
         tcnt=(270.16_r8-t(i))**1.3_r8
@@ -1197,10 +1255,10 @@ subroutine contact_freezing (microp_uniform, t, p, rndst, nacon, &
         contact_factor = dot_product(ndfaer,nacon(i,:)*tcnt) * pi * &
              ncic(i) * (pgam(i) + 1._r8) / lamc(i)
 
-        mnucct(i) = dum * contact_factor * &
+        mnucct(i) = dum(i) * contact_factor * &
              pi/3._r8*rhow*rising_factorial(pgam(i)+2._r8, 3)/lamc(i)**3
 
-        nnucct(i) =  dum1 * 2._r8 * contact_factor
+        nnucct(i) =  dum1(i) * 2._r8 * contact_factor
 
      else
 
@@ -1483,7 +1541,8 @@ subroutine accrete_cloud_water_rain(microp_uniform, qric, qcic, &
   integer :: i
 
   if (.not. microp_uniform) then
-    pra_coef(:) = accre_enhan * var_coef(relvar(:), 1.15_r8)
+    call var_coef(relvar, 1.15_r8, pra_coef, mgncol)
+    pra_coef(:) = accre_enhan(:) * pra_coef(:)
   else
     pra_coef(:) = 1._r8
   end if
@@ -1628,7 +1687,7 @@ subroutine evaporate_sublimate_precip(t, rho, dv, mu, sc, q, qvl, qvi, &
   real(r8), dimension(mgncol), intent(out) :: am_evp_st ! Fractional area where rain evaporates.
 
   real(r8) :: qclr   ! water vapor mixing ratio in clear air
-  real(r8) :: ab     ! correction to account for latent heat
+  real(r8) :: abr(mgncol), ab(mgncol)     ! correction to account for latent heat
   real(r8) :: eps    ! 1/ sat relaxation timescale
 
   real(r8), dimension(mgncol) :: dum
@@ -1646,6 +1705,10 @@ subroutine evaporate_sublimate_precip(t, rho, dv, mu, sc, q, qvl, qvi, &
         dum(i) = lcldm(i)
      end if
   enddo
+
+  call calc_ab_vect(t, qvl, xxlv, abr, mgncol)
+  call calc_ab_vect(t, qvi, xxls, ab, mgncol)
+
   do i=1,mgncol
   ! only calculate if there is some precip fraction > cloud fraction
 
@@ -1661,14 +1724,13 @@ subroutine evaporate_sublimate_precip(t, rho, dv, mu, sc, q, qvl, qvi, &
         ! evaporation of rain
         if (qric(i) >= qsmall) then
 
-           ab = calc_ab(t(i), qvl(i), xxlv)
            eps = 2._r8*pi*n0r(i)*rho(i)*Dv(i)* &
                 (f1r/(lamr(i)*lamr(i))+ &
                 f2r*(arn(i)*rho(i)/mu(i))**0.5_r8* &
                 sc(i)**(1._r8/3._r8)*gamma_half_br_plus5/ &
                 (lamr(i)**(5._r8/2._r8+br/2._r8)))
 
-           pre(i) = eps*(qclr-qvl(i))/ab
+           pre(i) = eps*(qclr-qvl(i))/abr(i)
 
            ! only evaporate in out-of-cloud region
            ! and distribute across precip_frac
@@ -1680,13 +1742,12 @@ subroutine evaporate_sublimate_precip(t, rho, dv, mu, sc, q, qvl, qvi, &
 
         ! sublimation of snow
         if (qsic(i) >= qsmall) then
-           ab = calc_ab(t(i), qvi(i), xxls)
            eps = 2._r8*pi*n0s(i)*rho(i)*Dv(i)* &
                 (f1s/(lams(i)*lams(i))+ &
                 f2s*(asn(i)*rho(i)/mu(i))**0.5_r8* &
                 sc(i)**(1._r8/3._r8)*gamma_half_bs_plus5/ &
                 (lams(i)**(5._r8/2._r8+bs/2._r8)))
-           prds(i) = eps*(qclr-qvi(i))/ab
+           prds(i) = eps*(qclr-qvi(i))/ab(i)
 
            ! only sublimate in out-of-cloud region and distribute over precip_frac
            prds(i)=min(prds(i)*am_evp_st(i),0._r8)
@@ -1758,7 +1819,7 @@ subroutine evaporate_sublimate_precip_graupel(t, rho, dv, mu, sc, q, qvl, qvi, &
   real(r8), dimension(mgncol), intent(out) :: am_evp_st ! Fractional area where rain evaporates.
 
   real(r8) :: qclr   ! water vapor mixing ratio in clear air
-  real(r8) :: ab     ! correction to account for latent heat
+  real(r8) :: abr(mgncol), ab(mgncol), abg(mgncol)      ! correction to account for latent heat
   real(r8) :: eps    ! 1/ sat relaxation timescale
 
   real(r8), dimension(mgncol) :: dum
@@ -1776,6 +1837,11 @@ subroutine evaporate_sublimate_precip_graupel(t, rho, dv, mu, sc, q, qvl, qvi, &
         dum(i) = lcldm(i)
      end if
   enddo
+
+  call calc_ab_vect(t, qvl, xxlv, abr, mgncol)
+  call calc_ab_vect(t, qvi, xxls, ab, mgncol)
+  call calc_ab_vect(t, qvi, xxls, abg, mgncol)
+
   do i=1,mgncol
   ! only calculate if there is some precip fraction > cloud fraction
 
@@ -1791,14 +1857,13 @@ subroutine evaporate_sublimate_precip_graupel(t, rho, dv, mu, sc, q, qvl, qvi, &
         ! evaporation of rain
         if (qric(i) >= qsmall) then
 
-           ab = calc_ab(t(i), qvl(i), xxlv)
            eps = 2._r8*pi*n0r(i)*rho(i)*Dv(i)* &
                 (f1r/(lamr(i)*lamr(i))+ &
                 f2r*(arn(i)*rho(i)/mu(i))**0.5_r8* &
                 sc(i)**(1._r8/3._r8)*gamma_half_br_plus5/ &
                 (lamr(i)**(5._r8/2._r8+br/2._r8)))
 
-           pre(i) = eps*(qclr-qvl(i))/ab
+           pre(i) = eps*(qclr-qvl(i))/abr(i)
 
            ! only evaporate in out-of-cloud region
            ! and distribute across precip_frac
@@ -1810,13 +1875,12 @@ subroutine evaporate_sublimate_precip_graupel(t, rho, dv, mu, sc, q, qvl, qvi, &
 
         ! sublimation of snow
         if (qsic(i) >= qsmall) then
-           ab = calc_ab(t(i), qvi(i), xxls)
            eps = 2._r8*pi*n0s(i)*rho(i)*Dv(i)* &
                 (f1s/(lams(i)*lams(i))+ &
                 f2s*(asn(i)*rho(i)/mu(i))**0.5_r8* &
                 sc(i)**(1._r8/3._r8)*gamma_half_bs_plus5/ &
                 (lams(i)**(5._r8/2._r8+bs/2._r8)))
-           prds(i) = eps*(qclr-qvi(i))/ab
+           prds(i) = eps*(qclr-qvi(i))/ab(i)
 
           ! only sublimate in out-of-cloud region and distribute over precip_frac
            prds(i)=min(prds(i)*am_evp_st(i),0._r8)
@@ -1827,14 +1891,13 @@ subroutine evaporate_sublimate_precip_graupel(t, rho, dv, mu, sc, q, qvl, qvi, &
 
         ! add graupel, do the Same with prdg.
         if (qgic(i).ge.qsmall) then
-           ab = calc_ab(t(i), qvi(i), xxls)
            
            eps = 2._r8*pi*n0g(i)*rho(i)*Dv(i)*                    &
                 (f1s/(lamg(i)*lamg(i))+                           &
                 f2s*(agn(i)*rho(i)/mu(i))**0.5_r8*                &
                 sc(i)**(1._r8/3._r8)*gamma(5._r8/2._r8+bg/2._r8)/ &
                 (lamg(i)**(5._r8/2._r8+bs/2._r8)))
-           prdg(i) = eps*(qclr-qvi(i))/ab
+           prdg(i) = eps*(qclr-qvi(i))/abg(i)
            
            ! only sublimate in out-of-cloud region and distribute over precip_frac
            prdg(i)=min(prdg(i)*am_evp_st(i),0._r8)
@@ -1883,20 +1946,20 @@ subroutine bergeron_process_snow(t, rho, dv, mu, sc, qvl, qvi, asn, &
   ! Output tendencies
   real(r8), dimension(mgncol), intent(out) :: bergs
 
-  real(r8) :: ab     ! correction to account for latent heat
+  real(r8) :: ab(mgncol)     ! correction to account for latent heat
   real(r8) :: eps    ! 1/ sat relaxation timescale
 
   integer :: i
 
+  call calc_ab_vect(t, qvi, xxls, ab, mgncol)
   do i=1,mgncol
      if (qsic(i) >= qsmall.and. qcic(i) >= qsmall .and. t(i) < tmelt) then
-        ab = calc_ab(t(i), qvi(i), xxls)
         eps = 2._r8*pi*n0s(i)*rho(i)*Dv(i)* &
              (f1s/(lams(i)*lams(i))+ &
              f2s*(asn(i)*rho(i)/mu(i))**0.5_r8* &
              sc(i)**(1._r8/3._r8)*gamma_half_bs_plus5/ &
              (lams(i)**(5._r8/2._r8+bs/2._r8)))
-        bergs(i) = eps*(qvl(i)-qvi(i))/ab
+        bergs(i) = eps*(qvl(i)-qvi(i))/ab(i)
      else
         bergs(i) = 0._r8
      end if
