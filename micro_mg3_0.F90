@@ -116,8 +116,8 @@ use shr_spfn_mod, only: gamma => shr_spfn_gamma
 #endif
 
 use wv_sat_methods, only: &
-     qsat_water => wv_sat_qsat_water, &
-     qsat_ice => wv_sat_qsat_ice
+     qsat_water => wv_sat_qsat_water_vect, &
+     qsat_ice => wv_sat_qsat_ice_vect
 
 ! Parameters from the utilities module.
 use micro_mg_utils, only: &
@@ -862,12 +862,12 @@ subroutine micro_mg_tend ( &
   ! saturation vapor pressures
   real(r8) :: esl(mgncol,nlev)    ! liquid
   real(r8) :: esi(mgncol,nlev)    ! ice
-  real(r8) :: esn                 ! checking for RH after rain evap
+  real(r8) :: esnA(mgncol)        ! checking for RH after rain evap
 
   ! saturation vapor mixing ratios
   real(r8) :: qvl(mgncol,nlev)    ! liquid
   real(r8) :: qvi(mgncol,nlev)    ! ice
-  real(r8) :: qvn                 ! checking for RH after rain evap
+  real(r8) :: qvnA(mgncol), qvnAI(mgncol)  ! checking for RH after rain evap
 
   ! relative humidity
   real(r8) :: relhum(mgncol,nlev)
@@ -897,16 +897,12 @@ subroutine micro_mg_tend ( &
   real(r8) :: rainrt(mgncol,nlev)     ! rain rate for reflectivity calculation
 
   ! dummy variables
-  real(r8) :: dum
-  real(r8) :: dum1
-  real(r8) :: dum2
-  real(r8) :: dum3
+  real(r8) :: dum, dum1, qtmp
+  real(r8) :: dum1A(mgncol), dum2A(mgncol), dum3A(mgncol)
   real(r8) :: dumni0, dumni0A2D(mgncol,nlev)
   real(r8) :: dumns0, dumns0A2D(mgncol,nlev)
   ! dummies for checking RH
-  real(r8) :: qtmp
-  real(r8) :: ttmp
-  real(r8) :: qtmpA(mgncol)
+  real(r8) :: qtmpA(mgncol), ttmpA(mgncol), qtmpAI(mgncol)
   ! dummies for conservation check
   real(r8) :: ratio
   real(r8) :: tmpfrz
@@ -1026,18 +1022,17 @@ subroutine micro_mg_tend ( &
   !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
   ! Get humidity and saturation vapor pressures
 
+  call qsat_water(t, p, esl, qvl, mgncol*nlev)
+  call qsat_ice(t, p, esi, qvi, mgncol*nlev)
+
   do k=1,nlev
      do i=1,mgncol
-
-        call qsat_water(t(i,k), p(i,k), esl(i,k), qvl(i,k))
 
         ! make sure when above freezing that esi=esl, not active yet
         if (t(i,k) >= tmelt) then
            esi(i,k)=esl(i,k)
            qvi(i,k)=qvl(i,k)
         else
-           call qsat_ice(t(i,k), p(i,k), esi(i,k), qvi(i,k))
-
            ! Scale the water saturation values to reflect subgrid scale
            ! ice cloud fraction, where ice clouds begin forming at a
            ! gridbox average relative humidity of rhmini (not 1).
@@ -2207,48 +2202,70 @@ subroutine micro_mg_tend ( &
         ! don't include other microphysical processes since they haven't
         ! been limited via conservation checks yet
 
-        if ((pre(i,k)+prds(i,k)+prdg(i,k))*precip_frac(i,k)+ice_sublim(i,k) < -1.e-20_r8) then
-           qtmp=q(i,k)-(ice_sublim(i,k)+vap_dep(i,k)+mnuccd(i,k)+ &
+        qtmpAI(i)=q(i,k)-(ice_sublim(i,k)+vap_dep(i,k)+mnuccd(i,k)+ &
                 (pre(i,k)+prds(i,k)+prdg(i,k))*precip_frac(i,k))*deltat
-           ttmp=t(i,k)+((pre(i,k)*precip_frac(i,k))*xxlv+ &
-                ((prds(i,k)+prdg(i,k))*precip_frac(i,k)+vap_dep(i,k)+ice_sublim(i,k)+mnuccd(i,k))*xxls)*deltat/cpp
+        ttmpA(i)=t(i,k)+((pre(i,k)*precip_frac(i,k))*xxlv+ &
+             ((prds(i,k)+prdg(i,k))*precip_frac(i,k)+vap_dep(i,k)+ice_sublim(i,k)+mnuccd(i,k))*xxls)*deltat/cpp
+     end do
 
-           ! use rhw to allow ice supersaturation
-           call qsat_water(ttmp, p(i,k), esn, qvn)
+     ! use rhw to allow ice supersaturation
+     call qsat_water(ttmpA, p(:,k), esnA, qvnAI, mgncol)
 
+     do i=1,mgncol
+
+        if ((pre(i,k)+prds(i,k)+prdg(i,k))*precip_frac(i,k)+ice_sublim(i,k) < -1.e-20_r8) then
            ! modify ice/precip evaporation rate if q > qsat
-           if (qtmp > qvn) then
+           if (qtmpAI(i) > qvnAI(i)) then
 
-              dum1=pre(i,k)*precip_frac(i,k)/((pre(i,k)+prds(i,k)+prdg(i,k))*precip_frac(i,k)+ice_sublim(i,k))
-              dum2=prds(i,k)*precip_frac(i,k)/((pre(i,k)+prds(i,k)+prdg(i,k))*precip_frac(i,k)+ice_sublim(i,k))
-              dum3=prdg(i,k)*precip_frac(i,k)/((pre(i,k)+prds(i,k)+prdg(i,k))*precip_frac(i,k)+ice_sublim(i,k))
+              dum1A(i)=pre(i,k)*precip_frac(i,k)/((pre(i,k)+prds(i,k)+prdg(i,k))*precip_frac(i,k)+ice_sublim(i,k))
+              dum2A(i)=prds(i,k)*precip_frac(i,k)/((pre(i,k)+prds(i,k)+prdg(i,k))*precip_frac(i,k)+ice_sublim(i,k))
+              dum3A(i)=prdg(i,k)*precip_frac(i,k)/((pre(i,k)+prds(i,k)+prdg(i,k))*precip_frac(i,k)+ice_sublim(i,k))
 
-              ! recalculate q and t after vap_dep and mnuccd but without evap or sublim
-              qtmp=q(i,k)-(vap_dep(i,k)+mnuccd(i,k))*deltat
-              ttmp=t(i,k)+((vap_dep(i,k)+mnuccd(i,k))*xxls)*deltat/cpp
+              ! recalculate t after vap_dep and mnuccd but without evap or sublim
+              ttmpA(i)=t(i,k)+((vap_dep(i,k)+mnuccd(i,k))*xxls)*deltat/cpp
+           end if
+        end if
+     end do
 
-              ! use rhw to allow ice supersaturation
-              call qsat_water(ttmp, p(i,k), esn, qvn)
+     ! use rhw to allow ice supersaturation
+     call qsat_water(ttmpA, p(:,k), esnA, qvnA, mgncol)
 
-              dum=(qtmp-qvn)/(1._r8 + xxlv_squared*qvn/(cpp*rv*ttmp**2))
+     do i=1,mgncol
+
+        if ((pre(i,k)+prds(i,k)+prdg(i,k))*precip_frac(i,k)+ice_sublim(i,k) < -1.e-20_r8) then
+           ! modify ice/precip evaporation rate if q > qsat
+           if (qtmpAI(i) > qvnAI(i)) then
+
+              ! recalculate q after vap_dep and mnuccd but without evap or sublim
+              qtmpA(i)=q(i,k)-(vap_dep(i,k)+mnuccd(i,k))*deltat
+
+              dum=(qtmpA(i)-qvnA(i))/(1._r8 + xxlv_squared*qvnA(i)/(cpp*rv*ttmpA(i)**2))
               dum=min(dum,0._r8)
 
               ! modify rates if needed, divide by precip_frac to get local (in-precip) value
-              pre(i,k)=dum*dum1*rdeltat/precip_frac(i,k)
+              pre(i,k)=dum*dum1A(i)*rdeltat/precip_frac(i,k)
+           end if
+        end if
+     end do
 
-              ! do separately using RHI for prds and ice_sublim
-              call qsat_ice(ttmp, p(i,k), esn, qvn)
+     ! do separately using RHI for prds and ice_sublim
+     call qsat_ice(ttmpA, p(:,k), esnA, qvnA, mgncol)
 
-              dum=(qtmp-qvn)/(1._r8 + xxls_squared*qvn/(cpp*rv*ttmp**2))
+     do i=1,mgncol
+              
+        if ((pre(i,k)+prds(i,k)+prdg(i,k))*precip_frac(i,k)+ice_sublim(i,k) < -1.e-20_r8) then
+           ! modify ice/precip evaporation rate if q > qsat
+           if (qtmpAI(i) > qvnAI(i)) then
+              dum=(qtmpA(i)-qvnA(i))/(1._r8 + xxls_squared*qvnA(i)/(cpp*rv*ttmpA(i)**2))
               dum=min(dum,0._r8)
 
               ! modify rates if needed, divide by precip_frac to get local (in-precip) value
-              prds(i,k) = dum*dum2*rdeltat/precip_frac(i,k)
-              prdg(i,k) = dum*dum3*rdeltat/precip_frac(i,k)
+              prds(i,k) = dum*dum2A(i)*rdeltat/precip_frac(i,k)
+              prdg(i,k) = dum*dum3A(i)*rdeltat/precip_frac(i,k)
 
               ! don't divide ice_sublim by cloud fraction since it is grid-averaged
-              dum1 = (1._r8-dum1-dum2-dum3)
-              ice_sublim(i,k) = dum*dum1*rdeltat
+              dum1A(i) = (1._r8-dum1A(i)-dum2A(i)-dum3A(i))
+              ice_sublim(i,k) = dum*dum1A(i)*rdeltat
            end if
         end if
 
@@ -3313,30 +3330,32 @@ subroutine micro_mg_tend ( &
      do k=1,nlev
         do i=1,mgncol
 
-           qtmp=q(i,k)+qvlat(i,k)*deltat
-           ttmp=t(i,k)+tlat(i,k)/cpp*deltat
+           qtmpA(i)=q(i,k)+qvlat(i,k)*deltat
+           ttmpA(i)=t(i,k)+tlat(i,k)/cpp*deltat
+        end do
 
-           ! use rhw to allow ice supersaturation
-           call qsat_water(ttmp, p(i,k), esn, qvn)
+        ! use rhw to allow ice supersaturation
+        call qsat_water(ttmpA, p(:,k), esnA, qvnA, mgncol)
 
-           if (qtmp > qvn .and. qvn > 0 .and. allow_sed_supersat) then
+        do i=1,mgncol
+           if (qtmpA(i) > qvnA(i) .and. qvnA(i) > 0 .and. allow_sed_supersat) then
               ! expression below is approximate since there may be ice deposition
-              dum = (qtmp-qvn)/(1._r8+xxlv_squared*qvn/(cpp*rv*ttmp**2))*rdeltat
+              dum = (qtmpA(i)-qvnA(i))/(1._r8+xxlv_squared*qvnA(i)/(cpp*rv*ttmpA(i)**2))*rdeltat
               ! add to output cme
               cmeout(i,k) = cmeout(i,k)+dum
               ! now add to tendencies, partition between liquid and ice based on temperature
-              if (ttmp > 268.15_r8) then
+              if (ttmpA(i) > 268.15_r8) then
                  dum1=0.0_r8
                  ! now add to tendencies, partition between liquid and ice based on te
                  !-------------------------------------------------------
-              else if (ttmp < 238.15_r8) then
+              else if (ttmpA(i) < 238.15_r8) then
                  dum1=1.0_r8
               else
-                 dum1=(268.15_r8-ttmp)/30._r8
+                 dum1=(268.15_r8-ttmpA(i))/30._r8
               end if
 
-              dum = (qtmp-qvn)/(1._r8+(xxls*dum1+xxlv*(1._r8-dum1))**2 &
-                   *qvn/(cpp*rv*ttmp**2))*rdeltat
+              dum = (qtmpA(i)-qvnA(i))/(1._r8+(xxls*dum1+xxlv*(1._r8-dum1))**2 &
+                   *qvnA(i)/(cpp*rv*ttmpA(i)**2))*rdeltat
               qctend(i,k)=qctend(i,k)+dum*(1._r8-dum1)
               ! for output
               qcrestot(i,k)=dum*(1._r8-dum1)
