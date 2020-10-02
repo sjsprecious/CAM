@@ -26,6 +26,14 @@ dSFMT.o \
 dSFMT_utils.o \
 kissvec.o
 
+PUMAS_MG_OBJS=\
+micro_mg3_0.o \
+micro_mg_utils.o \
+micro_mg1_0.o \
+micro_mg_cam.o \
+micro_mg_data.o \
+wv_sat_methods.o
+
 ifeq ($(DEBUG),FALSE)
   $(PERFOBJS): %.o: %.F90
 	  $(FC) -c $(INCLDIR) $(INCS) $(FFLAGS) $(FREEFLAGS)  -O3  -no-prec-div $<
@@ -37,4 +45,6 @@ ifeq ($(DEBUG),FALSE)
 	  $(FC) -c $(INCLDIR) $(INCS) $(FFLAGS) $(FREEFLAGS) -O3 -fp-model fast -no-prec-div -no-prec-sqrt -qoverride-limits $<
   $(SHR_RANDNUM_C_OBJS): %.o: %.c
 	  $(CC) -c $(INCLDIR) $(INCS) $(CFLAGS) -O3 -fp-model fast $<
+  $(PUMAS_MG_OBJS): %.o: %.F90
+	  $(FC) -c $(INCLDIR) $(INCS) $(FFLAGS) $(FREEFLAGS) -fp-model fast $<
 endif
