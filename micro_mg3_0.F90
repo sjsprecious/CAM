@@ -1846,7 +1846,7 @@ subroutine micro_mg_tend ( &
   call bergeron_process_snow(t, rho, dv, mu, sc, qvl, qvi, asn, qcic, qsic, lams, n0s, bergs, mgncol*nlev)
   do k=1,nlev
      do i=1,mgncol
-        bergs(:,k)=bergs(:,k)*micro_mg_berg_eff_factor
+        bergs(i,k)=bergs(i,k)*micro_mg_berg_eff_factor
      end do
   end do
 
@@ -3994,35 +3994,45 @@ subroutine Sedimentation(mgncol,nlev,do_cldice,deltat,fx,fnx,pdel_inv,qxtend,nxt
       ! This code modification makes this 
       ! reproduces existing answer
       !---------------------------------------------
-      mask        = 1._r8
-      where(n>iters)
-        mask      = 0._r8
-      end where
+      do i = 1,mgncol
+         mask(i)        = 1._r8
+         if (n > iters(i)) then
+            mask(i)     = 0._r8
+         end if
+      end do 
 
       if (do_cldice) then
          do k=1,nlev
-            faloutx(:,k)  = fx(:,k)  * dumx(:,k)  * mask
-            faloutnx(:,k) = fnx(:,k) * dumnx(:,k) * mask
-         enddo
+            do i = 1,mgncol
+               faloutx(i,k)  = fx(i,k)  * dumx(i,k)  * mask(i)
+               faloutnx(i,k) = fnx(i,k) * dumnx(i,k) * mask(i)
+            end do
+         end do
       else
-         faloutx          = 0._r8
-         faloutnx         = 0._r8
+         do k=1,nlev
+            do i = 1,mgncol
+               faloutx(i,k)  = 0._r8
+               faloutnx(i,k) = 0._r8
+            end do
+         end do
       end if
 
       ! top of model
       k = 1
       ! add fallout terms to microphysical tendencies
 
-      faltndx     = faloutx(:,k)*pdel_inv(:,k)
-      faltndnx    = faloutnx(:,k)*pdel_inv(:,k)
-      qxtend(:,k) = qxtend(:,k)-faltndx*rnstep
-      nxtend(:,k) = nxtend(:,k)-faltndnx*rnstep
-      ! sedimentation tendency for output
+      do i = 1,mgncol
+         faltndx(i)  = faloutx(i,k)*pdel_inv(i,k)
+         faltndnx(i) = faloutnx(i,k)*pdel_inv(i,k)
+         qxtend(i,k) = qxtend(i,k)-faltndx(i)*rnstep(i)
+         nxtend(i,k) = nxtend(i,k)-faltndnx(i)*rnstep(i)
+         ! sedimentation tendency for output
 
-      qxsedten(:,k)=qxsedten(:,k)-faltndx*rnstep
+         qxsedten(i,k)=qxsedten(i,k)-faltndx(i)*rnstep(i)
 
-      dumx(:,k)  = dumx(:,k)-faltndx*deltat*rnstep
-      dumnx(:,k) = dumnx(:,k)-faltndnx*deltat*rnstep
+         dumx(i,k)  = dumx(i,k)-faltndx(i)*deltat*rnstep(i)
+         dumnx(i,k) = dumnx(i,k)-faltndnx(i)*deltat*rnstep(i)
+      end do
 
       do k = 2,nlev
          ! for cloud liquid and ice, if cloud fraction increases with height
@@ -4031,44 +4041,48 @@ subroutine Sedimentation(mgncol,nlev,do_cldice,deltat,fx,fnx,pdel_inv,qxtend,nxt
          ! instantly
          ! note: this is not an issue with precip, since we assume max overlap
 
+         do i = 1,mgncol
+            if (present_xcldm) then
+               dum1(i)=xcldm(i,k)/xcldm(i,k-1)
+               dum1(i)=min(dum1(i),1._r8)
+            else
+               dum1(i)=1._r8
+            endif
+            faltndqxe(i)=(faloutx(i,k)-faloutx(i,k-1))*pdel_inv(i,k)
+            faltndx(i)  =(faloutx(i,k)-dum1(i)*faloutx(i,k-1))*pdel_inv(i,k)
+            faltndnx(i) =(faloutnx(i,k)-dum1(i)*faloutnx(i,k-1))*pdel_inv(i,k)
+            ! add fallout terms to eulerian tendencies
+   
+            qxtend(i,k) = qxtend(i,k)-faltndx(i)*rnstep(i)
+            nxtend(i,k) = nxtend(i,k)-faltndnx(i)*rnstep(i)
+            ! sedimentation tendency for output
+   
+            qxsedten(i,k)=qxsedten(i,k)-faltndx(i)*rnstep(i)
+            ! add terms to to evap/sub of cloud water
 
-         if(present_xcldm) then
-            dum1=xcldm(:,k)/xcldm(:,k-1)
-            dum1=min(dum1,1._r8)
-         else
-            dum1=1._r8
-         endif
-         faltndqxe=(faloutx(:,k)-faloutx(:,k-1))*pdel_inv(:,k)
-         faltndx  =(faloutx(:,k)-dum1*faloutx(:,k-1))*pdel_inv(:,k)
-         faltndnx =(faloutnx(:,k)-dum1*faloutnx(:,k-1))*pdel_inv(:,k)
-         ! add fallout terms to eulerian tendencies
-
-         qxtend(:,k) = qxtend(:,k)-faltndx*rnstep
-         nxtend(:,k) = nxtend(:,k)-faltndnx*rnstep
-         ! sedimentation tendency for output
-
-         qxsedten(:,k)=qxsedten(:,k)-faltndx*rnstep
-         ! add terms to to evap/sub of cloud water
-
-
-         ! for output
-         if(present_qxsevap) qxsevap(:,k)=qxsevap(:,k)-(faltndqxe-faltndx)*rnstep
-         if(present_qvlat)   qvlat(:,k)=qvlat(:,k)-(faltndqxe-faltndx)*rnstep
-         if(present_tlat)    tlat(:,k)=tlat(:,k)+(faltndqxe-faltndx)*xxlx*rnstep
-
-         dumx(:,k) = dumx(:,k)-faltndx*deltat*rnstep
-         dumnx(:,k) = dumnx(:,k)-faltndnx*deltat*rnstep
+            ! for output
+            if(present_qxsevap) qxsevap(i,k)=qxsevap(i,k)-(faltndqxe(i)-faltndx(i))*rnstep(i)
+            if(present_qvlat)   qvlat(i,k)=qvlat(i,k)-(faltndqxe(i)-faltndx(i))*rnstep(i)
+            if(present_tlat)    tlat(i,k)=tlat(i,k)+(faltndqxe(i)-faltndx(i))*xxlx*rnstep(i)
+   
+            dumx(i,k) = dumx(i,k)-faltndx(i)*deltat*rnstep(i)
+            dumnx(i,k) = dumnx(i,k)-faltndnx(i)*deltat*rnstep(i)
+         end do
 
       end do
       do k = 1,nlev
-        xflx(:,k+1) = xflx(:,k+1) + faloutx(:,k) / g * rnstep
+         do i = 1,mgncol
+            xflx(i,k+1) = xflx(i,k+1) + faloutx(i,k) / g * rnstep(i)
+         end do
       end do
+
       ! units below are m/s
       ! sedimentation flux at surface is added to precip flux at surface
       ! to get total precip (cloud + precip water) rate
-
-      prect(:) = prect(:)+faloutx(:,nlev)/g*rnstep/1000._r8
-      if(present_preci) preci(:) = preci(:)+faloutx(:,nlev)/g*rnstep/1000._r8
+      do i = 1,mgncol
+         prect(i) = prect(i)+faloutx(i,nlev)/g*rnstep(i)/1000._r8
+         if(present_preci) preci(i) = preci(i)+faloutx(i,nlev)/g*rnstep(i)/1000._r8
+      end do
 
    end do  ! n loop of 1, nstepMax
 
