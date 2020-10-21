@@ -141,6 +141,8 @@ use micro_mg_utils, only: &
      mi0, &
      rising_factorial
 
+use perf_mod
+
 implicit none
 private
 save
@@ -2806,10 +2808,12 @@ subroutine micro_mg_tend ( &
   end do
 
 #if 1
+  call t_startf ('micro_mg3_sed_ice')
   call Sedimentation(mgncol,nlev,do_cldice,deltat,fi,fni,pdel_inv, &
                      qitend,nitend,qisedten,dumi,dumni,prect,iflx, &
                      xxlx=xxls,qxsevap=qisevap,tlat=tlat,qvlat=qvlat, &
                      xcldm=icldm,preci=preci)
+  call t_stopf ('micro_mg3_sed_ice')
 #else
   ! initialize nstep for sedimentation sub-steps
 
@@ -2904,9 +2908,11 @@ subroutine micro_mg_tend ( &
 #endif
 
 #if 1
+  call t_startf ('micro_mg3_sed_liq')
   call Sedimentation(mgncol,nlev,.TRUE.,deltat,fc,fnc,pdel_inv, &
                      qctend,nctend,qcsedten,dumc,dumnc,prect,lflx, &
                      xxlx=xxlv,qxsevap=qcsevap,tlat=tlat,qvlat=qvlat,xcldm=lcldm)
+  call t_stopf ('micro_mg3_sed_liq')
 #else
   do i=1,mgncol
      ! calculate number of split time steps to ensure courant stability criteria
@@ -2979,8 +2985,10 @@ subroutine micro_mg_tend ( &
 #endif
 
 #if 1
+  call t_startf ('micro_mg3_sed_rain')
   call Sedimentation(mgncol,nlev,.TRUE.,deltat,fr,fnr,pdel_inv, &
                      qrtend,nrtend,qrsedten,dumr,dumnr,prect,rflx)
+  call t_stopf ('micro_mg3_sed_rain')
 #else
   do i=1,mgncol
      ! calculate number of split time steps to ensure courant stability criteria
@@ -3043,8 +3051,10 @@ subroutine micro_mg_tend ( &
 #endif
 
 #if 1
+  call t_startf ('micro_mg3_sed_snow')
   call Sedimentation(mgncol,nlev,.TRUE.,deltat,fs,fns,pdel_inv, &
                      qstend,nstend,qssedten,dums,dumns,prect,sflx,preci=preci)
+  call t_stopf ('micro_mg3_sed_snow')
 #else
   do i=1,mgncol
      ! calculate number of split time steps to ensure courant stability criteria
@@ -3108,8 +3118,10 @@ subroutine micro_mg_tend ( &
 #endif
 
 #if 1
+  call t_startf ('micro_mg3_sed_graupel')
   call Sedimentation(mgncol,nlev,.TRUE.,deltat,fg,fng,pdel_inv, &
                      qgtend,ngtend,qgsedten,dumg,dumng,prect,gflx,preci=preci)
+  call t_stopf ('micro_mg3_sed_graupel')
 #else
   do i=1,mgncol
      ! Graupel Sedimentation
