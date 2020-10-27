@@ -116,6 +116,10 @@ interface size_dist_param_basic
   module procedure size_dist_param_basic_vect2
   module procedure size_dist_param_basic_line
 end interface
+interface calc_ab
+  module procedure calc_ab_line
+  module procedure calc_ab_vect
+end interface
 
 !=================================================
 ! Public module parameters (mostly for MG itself)
@@ -305,7 +309,7 @@ subroutine micro_mg_utils_init( kind, rair, rh2o, cpair, tmelt_in, latvap, &
   if( kind .ne. r8 ) then
      errstring = 'micro_mg_init: KIND of reals does not match'
      return
-  endif
+  end if
 
   ! declarations for MG code (transforms variable names)
 
@@ -376,13 +380,13 @@ end function NewMGHydrometeorProps
 !========================================================================
 
 ! Use gamma function to implement rising factorial extended to the reals.
-pure function rising_factorial_r8(x, n) result(res)
+subroutine rising_factorial_r8(x, n, res)
   real(r8), intent(in) :: x, n
-  real(r8) :: res
+  real(r8), intent(out) :: res
 
   res = gamma(x+n)/gamma(x)
 
-end function rising_factorial_r8
+end subroutine rising_factorial_r8
 
 subroutine rising_factorial_r8_vec(x, n, res,vlen)
   integer, intent(in)   :: vlen
@@ -391,20 +395,27 @@ subroutine rising_factorial_r8_vec(x, n, res,vlen)
   integer :: i
   real(r8) :: tmp(vlen)
 
+#if defined(__OPENACC__)
   do i=1,vlen
      tmp(i) = x(i)+n
      res(i) = gamma(tmp(i))
      tmp(i) = gamma(x(i))
      res(i) = res(i)/tmp(i)
   end do
+#else
+  tmp = x+n
+  res = gamma(tmp)
+  tmp = gamma(x)
+  res = res/tmp
+#endif
 
 end subroutine rising_factorial_r8_vec
 
 ! Rising factorial can be performed much cheaper if n is a small integer.
-pure function rising_factorial_integer(x, n) result(res)
-  real(r8), intent(in) :: x
-  integer, intent(in) :: n
-  real(r8) :: res
+subroutine rising_factorial_integer(x, n, res)
+  real(r8), intent(in)  :: x
+  integer,  intent(in)  :: n
+  real(r8), intent(out) :: res
 
   integer :: i
   real(r8) :: factor
@@ -417,12 +428,12 @@ pure function rising_factorial_integer(x, n) result(res)
      factor = factor + 1._r8
   end do
 
-end function rising_factorial_integer
+end subroutine rising_factorial_integer
 
 subroutine rising_factorial_integer_vec(x, n, res,vlen)
-  integer, intent(in) :: vlen
-  real(r8), intent(in) :: x(vlen)
-  integer, intent(in) :: n
+  integer,  intent(in)  :: vlen
+  real(r8), intent(in)  :: x(vlen)
+  integer,  intent(in)  :: n
   real(r8), intent(out) :: res(vlen)
 
   integer  :: i,j
@@ -454,24 +465,23 @@ subroutine rising_factorial_integer_vec(x, n, res,vlen)
           factor(i) = factor(i) + 1._r8
        end do
     end do
-  endif
+  end if
 
 end subroutine rising_factorial_integer_vec
 
 ! Calculate correction due to latent heat for evaporation/sublimation
-elemental function calc_ab(t, qv, xxl) result(ab)
-  real(r8), intent(in) :: t     ! Temperature
-  real(r8), intent(in) :: qv    ! Saturation vapor pressure
-  real(r8), intent(in) :: xxl   ! Latent heat
-
-  real(r8) :: ab
+subroutine calc_ab_line(t, qv, xxl, ab)
+  real(r8), intent(in)  :: t     ! Temperature
+  real(r8), intent(in)  :: qv    ! Saturation vapor pressure
+  real(r8), intent(in)  :: xxl   ! Latent heat
+  real(r8), intent(out) :: ab
 
   real(r8) :: dqsdt
 
   dqsdt = xxl*qv / (rv * t**2)
   ab = 1._r8 + dqsdt*xxl/cpp
 
-end function calc_ab
+end subroutine calc_ab_line
 
 ! Calculate correction due to latent heat for evaporation/sublimation
 subroutine calc_ab_vect(t, qv, xxl, ab, vlen)
@@ -487,21 +497,22 @@ subroutine calc_ab_vect(t, qv, xxl, ab, vlen)
   do i=1,vlen
      dqsdt(i) = xxl*qv(i) / (rv * t(i)**2)
      ab(i) = 1._r8 + dqsdt(i)*xxl/cpp
-  enddo
+  end do
 
 end subroutine calc_ab_vect
 
 ! get cloud droplet size distribution parameters
-elemental subroutine size_dist_param_liq_line(props, qcic, ncic, rho, pgam, lamc)
-  type(MGHydrometeorProps), intent(in) :: props
-  real(r8), intent(in) :: qcic
-  real(r8), intent(inout) :: ncic
-  real(r8), intent(in) :: rho
+subroutine size_dist_param_liq_line(props, qcic, ncic, rho, pgam, lamc)
+  type(MGHydrometeorProps), intent(in)    :: props
+  real(r8),                 intent(in)    :: qcic
+  real(r8),                 intent(inout) :: ncic
+  real(r8),                 intent(in)    :: rho
+  real(r8),                 intent(out)   :: pgam
+  real(r8),                 intent(out)   :: lamc
 
-  real(r8), intent(out) :: pgam
-  real(r8), intent(out) :: lamc
-
-  type(MGHydrometeorProps) :: props_loc
+  ! local variables
+  type(MGHydrometeorProps)                :: props_loc
+  real(r8)                                :: tmp
 
   if (qcic > qsmall) then
 
@@ -518,11 +529,11 @@ elemental subroutine size_dist_param_liq_line(props, qcic, ncic, rho, pgam, lamc
      ! Set coefficient for use in size_dist_param_basic.
      ! The 3D case is so common and optimizable that we specialize it:
      if (props_loc%eff_dim == 3._r8) then
-        props_loc%shape_coef = pi / 6._r8 * props_loc%rho * &
-             rising_factorial(pgam+1._r8, 3)
+        call rising_factorial(pgam+1._r8, 3, tmp)
+        props_loc%shape_coef = pi / 6._r8 * props_loc%rho * tmp
      else
-        props_loc%shape_coef = pi / 6._r8 * props_loc%rho * &
-             rising_factorial(pgam+1._r8, props_loc%eff_dim)
+        call rising_factorial(pgam+1._r8, props_loc%eff_dim, tmp)
+        props_loc%shape_coef = pi / 6._r8 * props_loc%rho * tmp
      end if
 
      ! Limit to between 2 and 50 microns mean size.
@@ -544,13 +555,15 @@ end subroutine size_dist_param_liq_line
 
 subroutine size_dist_param_liq_vect(props, qcic, ncic, rho, pgam, lamc, vlen)
 
-  type(mghydrometeorprops), intent(in) :: props
-  integer,                          intent(in) :: vlen
-  real(r8), dimension(vlen), intent(in) :: qcic
+  type(mghydrometeorprops), intent(in)     :: props
+  integer,                  intent(in)     :: vlen
+  real(r8), dimension(vlen), intent(in)    :: qcic
   real(r8), dimension(vlen), intent(inout) :: ncic
-  real(r8), dimension(vlen), intent(in) :: rho
-  real(r8), dimension(vlen), intent(out) :: pgam
-  real(r8), dimension(vlen), intent(out) :: lamc
+  real(r8), dimension(vlen), intent(in)    :: rho
+  real(r8), dimension(vlen), intent(out)   :: pgam
+  real(r8), dimension(vlen), intent(out)   :: lamc
+
+  ! local variables
   integer :: i, cnt
   real(r8) :: tmp(vlen),pgamp1(vlen)
   real(r8) :: shapeC(vlen),lbnd(vlen),ubnd(vlen)
@@ -564,8 +577,8 @@ subroutine size_dist_param_liq_vect(props, qcic, ncic, rho, pgam, lamc, vlen)
           pgam(i) = 1._r8/(pgam(i)**2) - 1._r8
           pgam(i) = max(pgam(i), 2._r8)
           pgamp1(i) = pgam(i)+1._r8
-       endif
-    enddo
+       end if
+    end do
     ! Set coefficient for use in size_dist_param_basic.
     ! The 3D case is so common and optimizable that we specialize
     ! it:
@@ -573,7 +586,7 @@ subroutine size_dist_param_liq_vect(props, qcic, ncic, rho, pgam, lamc, vlen)
        call rising_factorial(pgamp1,3,tmp,vlen)
     else
        call rising_factorial(pgamp1, props%eff_dim,tmp,vlen)
-    endif
+    end if
 
     do i=1,vlen
        if (qcic(i) > qsmall) then
@@ -581,10 +594,10 @@ subroutine size_dist_param_liq_vect(props, qcic, ncic, rho, pgam, lamc, vlen)
           ! Limit to between 2 and 50 microns mean size.
           lbnd(i)   = pgamp1(i)*1._r8/50.e-6_r8
           ubnd(i)   = pgamp1(i)*1._r8/2.e-6_r8
-       endif
-    enddo
+       end if
+    end do
     call size_dist_param_basic(props, qcic, ncic, shapeC, lbnd, ubnd, lamc, vlen)
-  endif
+  end if
 
   do i=1,vlen
      if (qcic(i) <= qsmall) then
@@ -594,18 +607,18 @@ subroutine size_dist_param_liq_vect(props, qcic, ncic, rho, pgam, lamc, vlen)
         pgam(i) = -100._r8
         lamc(i) = 0._r8
      end if
-  enddo
+  end do
 
 end subroutine size_dist_param_liq_vect
 
 ! Basic routine for getting size distribution parameters.
-elemental subroutine size_dist_param_basic_line(props, qic, nic, lam, n0)
-  type(MGHydrometeorProps), intent(in) :: props
-  real(r8), intent(in) :: qic
-  real(r8), intent(inout) :: nic
+subroutine size_dist_param_basic_line(props, qic, nic, lam, n0)
+  type(MGHydrometeorProps), intent(in)    :: props
+  real(r8),                 intent(in)    :: qic
+  real(r8),                 intent(inout) :: nic
 
-  real(r8), intent(out) :: lam
-  real(r8), intent(out), optional :: n0
+  real(r8),                 intent(out)           :: lam
+  real(r8),                 intent(out), optional :: n0
 
   if (qic > qsmall) then
 
@@ -638,14 +651,14 @@ end subroutine size_dist_param_basic_line
 
 subroutine size_dist_param_basic_vect(props, qic, nic, lam, vlen, n0)
 
-  type (mghydrometeorprops),   intent(in)  :: props
-  integer,                     intent(in)  :: vlen
+  type (mghydrometeorprops), intent(in)    :: props
+  integer,                   intent(in)    :: vlen
   real(r8), dimension(vlen), intent(in)    :: qic
   real(r8), dimension(vlen), intent(inout) :: nic
   real(r8), dimension(vlen), intent(out)   :: lam
   real(r8), dimension(vlen), intent(out), optional :: n0
-  integer :: i
-  logical :: limiterActive
+  integer  :: i
+  logical  :: limiterActive
   real(r8) :: effDim,shapeCoef,ubnd,lbnd, minMass
 
   limiterActive = limiter_is_on(props%min_mean_mass)
@@ -682,20 +695,24 @@ subroutine size_dist_param_basic_vect(props, qic, nic, lam, vlen, n0)
         lam(i) = 0._r8
      end if
 
-  enddo
+  end do
 
-  if (present(n0)) n0 = nic * lam
+  if (present(n0)) then
+     do i = 1, vlen
+        n0(i) = nic(i) * lam(i)
+     end do
+  end if
 
 end subroutine size_dist_param_basic_vect
 
 subroutine size_dist_param_basic_vect2(props, qic, nic, shapeC,lbnd,ubnd, lam, vlen, n0)
 
-  type (mghydrometeorprops), intent(in) :: props
-  integer,                          intent(in) :: vlen
-  real(r8), dimension(vlen), intent(in) :: qic
+  type (mghydrometeorprops), intent(in)    :: props
+  integer,                   intent(in)    :: vlen
+  real(r8), dimension(vlen), intent(in)    :: qic
   real(r8), dimension(vlen), intent(inout) :: nic
-  real(r8), dimension(vlen), intent(in) :: shapeC,lbnd,ubnd
-  real(r8), dimension(vlen), intent(out) :: lam
+  real(r8), dimension(vlen), intent(in)    :: shapeC,lbnd,ubnd
+  real(r8), dimension(vlen), intent(out)   :: lam
   real(r8), dimension(vlen), intent(out), optional :: n0
   integer  :: i
   integer  :: cnt
@@ -727,12 +744,11 @@ subroutine size_dist_param_basic_vect2(props, qic, nic, shapeC,lbnd,ubnd, lam, v
            lam(i) = ubnd(i)
            nic(i) = lam(i)**(effDim) * qic(i)/shapeC(i)
         end if
-
      else
         lam(i) = 0._r8
      end if
 
-  enddo
+  end do
 
   if (present(n0)) then
      do i = 1,vlen
@@ -759,58 +775,60 @@ subroutine avg_diameter_vec (q, n, rho_air, rho_sub, avg_diameter, vlen)
    ! Finds the average diameter of particles given their density, and
    ! mass/number concentrations in the air.
    ! Assumes that diameter follows an exponential distribution.
-   integer,  intent(in) :: vlen
-   real(r8), intent(in) :: q(vlen)         ! mass mixing ratio
-   real(r8), intent(in) :: n(vlen)         ! number concentration (per volume)
-   real(r8), intent(in) :: rho_air(vlen)   ! local density of the air
-   real(r8), intent(in) :: rho_sub   ! density of the particle substance
+   integer,  intent(in)  :: vlen
+   real(r8), intent(in)  :: q(vlen)         ! mass mixing ratio
+   real(r8), intent(in)  :: n(vlen)         ! number concentration (per volume)
+   real(r8), intent(in)  :: rho_air(vlen)   ! local density of the air
+   real(r8), intent(in)  :: rho_sub   ! density of the particle substance
    real(r8), intent(out) :: avg_diameter(vlen)
    integer :: i
 
    do i=1,vlen
       avg_diameter(i) = (q(i)*rho_air(i)/(pi * rho_sub * n(i)))**(1._r8/3._r8)
-   enddo
+   end do
 
 end subroutine avg_diameter_vec
 
-elemental function var_coef_r8(relvar, a) result(res)
+subroutine var_coef_r8(relvar, a, res)
   ! Finds a coefficient for process rates based on the relative variance
   ! of cloud water.
-  real(r8), intent(in) :: relvar
-  real(r8), intent(in) :: a
-  real(r8) :: res
+  real(r8), intent(in)  :: relvar
+  real(r8), intent(in)  :: a
+  real(r8), intent(out) :: res
 
-  res = rising_factorial(relvar, a) / relvar**a
+  call rising_factorial(relvar, a, res) 
+  res = res / relvar**a
 
-end function var_coef_r8
+end subroutine var_coef_r8
 
 subroutine var_coef_r8_vect(relvar, a, res, vlen)
   ! Finds a coefficient for process rates based on the relative variance
   ! of cloud water.
-  integer :: vlen
-  real(r8), intent(in) :: relvar(vlen)
-  real(r8), intent(in) :: a
+  integer,  intent(in)  :: vlen
+  real(r8), intent(in)  :: relvar(vlen)
+  real(r8), intent(in)  :: a
   real(r8), intent(out) :: res(vlen)
-  integer :: i
+  integer  :: i
   real(r8) :: tmpA(vlen)
 
    call rising_factorial(relvar,a,tmpA,vlen)
    do i=1,vlen
       res(i) = tmpA(i)/relvar(i)**a
-   enddo
+   end do
 
 end subroutine var_coef_r8_vect
 
-elemental function var_coef_integer(relvar, a) result(res)
+subroutine var_coef_integer(relvar, a, res)
   ! Finds a coefficient for process rates based on the relative variance
   ! of cloud water.
   real(r8), intent(in) :: relvar
   integer, intent(in) :: a
-  real(r8) :: res
+  real(r8), intent(out) :: res
 
-  res = rising_factorial(relvar, a) / relvar**a
+  call rising_factorial(relvar, a, res)
+  res = res / relvar**a
 
-end function var_coef_integer
+end subroutine var_coef_integer
 
 subroutine var_coef_integer_vect(relvar, a, res, vlen)
   ! Finds a coefficient for process rates based on the relative variance
@@ -825,7 +843,7 @@ subroutine var_coef_integer_vect(relvar, a, res, vlen)
   call rising_factorial(relvar, a,tmp,vlen)
   do i=1,vlen
      res(i) = tmp(i) / relvar(i)**a
-  enddo
+  end do
 
 end subroutine var_coef_integer_vect
 
@@ -873,12 +891,16 @@ subroutine ice_deposition_sublimation(t, qv, qi, ni, &
   !GET IN-CLOUD qi, ni
   !===============================================
   do i = 1,vlen
-     qiic(i) = qi(i)/icldm(i)
-     niic(i) = ni(i)/icldm(i)
+     if (qi(i)>=qsmall) then
+        qiic(i) = qi(i)/icldm(i)
+        niic(i) = ni(i)/icldm(i)
+        !Compute linearized condensational heating correction
+        call calc_ab(t(i), qvi(i), xxls, ab(i))
+     end if
   end do
 
   !Compute linearized condensational heating correction
-  call calc_ab_vect(t, qvi, xxls, ab, vlen)
+!  call calc_ab(t, qvi, xxls, ab, vlen)
   !Get slope and intercept of gamma distn for ice.
   call size_dist_param_basic_vect(mg_ice_props, qiic, niic, lami, vlen, n0i)
 
@@ -1036,7 +1058,7 @@ subroutine sb2001v2_liq_autoconversion(pgam,qc,nc,qr,rho,relvar,au,nprc,nprc1,vl
        nprc(i)=0._r8
      end if
   
-  enddo
+  end do
 
   end subroutine sb2001v2_liq_autoconversion 
   
@@ -1084,7 +1106,7 @@ subroutine sb2001v2_accre_cld_water_rain(qc,nc,qr,rho,relvar,pra,npra,vlen)
       npra(i) = 0._r8
     end if 
   
-  enddo
+  end do
  
   end subroutine sb2001v2_accre_cld_water_rain   
 
@@ -1133,7 +1155,7 @@ subroutine ice_autoconversion(t, qiic, lami, n0i, dcs, prci, nprci, vlen)
         prci(i) = 0._r8
         nprci(i) = 0._r8
      end if
-  enddo
+  end do
 end subroutine ice_autoconversion
 
 ! immersion freezing (Bigg, 1953)
@@ -1165,8 +1187,8 @@ subroutine immersion_freezing(microp_uniform, t, pgam, lamc, &
 
   ! Coefficients that will be omitted for sub-columns
   real(r8), dimension(vlen) :: dum
-  integer :: i
-  real(r8) :: tmp1(vlen), tmp2(vlen)
+  integer  :: i
+  real(r8) :: tmp
 
   if (.not. microp_uniform) then
      call var_coef(relvar, 2, dum, vlen)
@@ -1176,20 +1198,19 @@ subroutine immersion_freezing(microp_uniform, t, pgam, lamc, &
      end do
   end if
 
-  call rising_factorial(pgam+1._r8, 3, tmp1, vlen)
-  call rising_factorial(pgam+4._r8, 3, tmp2, vlen)
-
   do i=1,vlen
 
      if (qcic(i) >= qsmall .and. t(i) < 269.15_r8) then
 
+        call rising_factorial(pgam(i)+1._r8, 3, tmp)
         nnuccc(i) = &
-             pi/6._r8*ncic(i)*tmp1(i)* &
+             pi/6._r8*ncic(i)*tmp* &
              bimm*(exp(aimm*(tmelt - t(i)))-1._r8)/lamc(i)**3
 
+        call rising_factorial(pgam(i)+4._r8, 3, tmp)
         mnuccc(i) = dum(i) * nnuccc(i) * &
              pi/6._r8*rhow* &
-             tmp2(i)/lamc(i)**3
+             tmp/lamc(i)**3
 
      else
         mnuccc(i) = 0._r8
@@ -1240,25 +1261,24 @@ subroutine contact_freezing (microp_uniform, t, p, rndst, nacon, &
   real(r8) :: ndfaer(size(rndst,2)) ! aerosol diffusivities (m^2/sec)
 
   ! Coefficients not used for subcolumns
-  real(r8), dimension(vlen) :: dum, dum1, tmp
+  real(r8) :: dum, dum1, tmp
 
   ! Common factor between mass and number.
   real(r8) :: contact_factor
 
   integer  :: i, j
 
-  call var_coef(relvar, 4._r8/3._r8, dum, vlen)
-  call var_coef(relvar, 1._r8/3._r8, dum1, vlen)
-  call rising_factorial(pgam+2._r8, 3, tmp, vlen)
-
   do i = 1, vlen
 
         if (qcic(i) >= qsmall .and. t(i) < 269.15_r8) then
    
            if (microp_uniform) then
-              dum(i)  = 1._r8
-              dum1(i) = 1._r8
-           endif
+              dum  = 1._r8
+              dum1 = 1._r8
+           else
+              call var_coef(relvar(i), 4._r8/3._r8, dum)
+              call var_coef(relvar(i), 1._r8/3._r8, dum1)
+           end if
    
            tcnt=(270.16_r8-t(i))**1.3_r8
            viscosity = 1.8e-5_r8*(t(i)/298.0_r8)**0.85_r8    ! Viscosity (kg/m/s)
@@ -1275,9 +1295,11 @@ subroutine contact_freezing (microp_uniform, t, p, rndst, nacon, &
            contact_factor = dot_product(ndfaer,nacon(i,:)*tcnt) * pi * &
                                         ncic(i) * (pgam(i) + 1._r8) / lamc(i)
    
-           mnucct(i) = dum(i) * contact_factor * pi/3._r8*rhow*tmp(i)/lamc(i)**3
+           call rising_factorial(pgam(i)+2._r8, 3, tmp)
+
+           mnucct(i) = dum * contact_factor * pi/3._r8*rhow*tmp/lamc(i)**3
    
-           nnucct(i) =  dum1(i) * 2._r8 * contact_factor
+           nnucct(i) =  dum1 * 2._r8 * contact_factor
    
         else
    
@@ -1320,7 +1342,7 @@ subroutine snow_self_aggregation(t, rho, asn, rhosn, qsic, nsic, nsagg, vlen)
      else
         nsagg(i)=0._r8
      end if
-  enddo
+  end do
 end subroutine snow_self_aggregation
 
 ! accretion of cloud droplets onto snow/graupel
@@ -1393,7 +1415,7 @@ subroutine accrete_cloud_water_snow(t, rho, asn, uns, mu, qcic, ncic, qsic, &
         psacws(i) = 0._r8
         npsacws(i) = 0._r8
      end if
-  enddo
+  end do
 end subroutine accrete_cloud_water_snow
 
 ! add secondary ice production due to accretion of droplets by snow
@@ -1420,7 +1442,7 @@ subroutine secondary_ice_production(t, psacws, msacwi, nsacwi, vlen)
         nsacwi(i) = 3.5e8_r8*(t(i)-265.16_r8)/3.0_r8*psacws(i)
      else
         nsacwi(i) = 0.0_r8
-     endif
+     end if
   end do
 
   do i=1,vlen
@@ -1493,7 +1515,7 @@ subroutine accrete_rain_snow(t, rho, umr, ums, unr, uns, qric, qsic, &
         pracs(i) = 0._r8
         npracs(i) = 0._r8
      end if
-  enddo
+  end do
 end subroutine accrete_rain_snow
 
 ! heterogeneous freezing of rain drops
@@ -1527,7 +1549,7 @@ subroutine heterogeneous_rain_freezing(t, qric, nric, lamr, mnuccr, nnuccr, vlen
         mnuccr(i) = 0._r8
         nnuccr(i) = 0._r8
      end if
-  enddo
+  end do
 end subroutine heterogeneous_rain_freezing
 
 ! accretion of cloud liquid water by rain
@@ -1607,7 +1629,7 @@ subroutine self_collection_rain(rho, qric, nric, nragg, vlen)
      else
         nragg(i) = 0._r8
      end if
-  enddo
+  end do
 end subroutine self_collection_rain
 
 
@@ -1654,7 +1676,7 @@ subroutine accrete_cloud_ice_snow(t, rho, asn, qiic, niic, qsic, &
         prai(i) = 0._r8
         nprai(i) = 0._r8
      end if
-  enddo
+  end do
 end subroutine accrete_cloud_ice_snow
 
 ! calculate evaporation/sublimation of rain and snow
@@ -1704,7 +1726,7 @@ subroutine evaporate_sublimate_precip(t, rho, dv, mu, sc, q, qvl, qvi, &
   real(r8), dimension(vlen), intent(out) :: am_evp_st ! Fractional area where rain evaporates.
 
   real(r8) :: qclr   ! water vapor mixing ratio in clear air
-  real(r8) :: abr(vlen), ab(vlen)     ! correction to account for latent heat
+  real(r8) :: abr, ab     ! correction to account for latent heat
   real(r8) :: eps    ! 1/ sat relaxation timescale
 
   real(r8), dimension(vlen) :: dum
@@ -1721,10 +1743,7 @@ subroutine evaporate_sublimate_precip(t, rho, dv, mu, sc, q, qvl, qvi, &
      else
         dum(i) = lcldm(i)
      end if
-  enddo
-
-  call calc_ab_vect(t, qvl, xxlv, abr, vlen)
-  call calc_ab_vect(t, qvi, xxls, ab, vlen)
+  end do
 
   do i=1,vlen
   ! only calculate if there is some precip fraction > cloud fraction
@@ -1739,14 +1758,13 @@ subroutine evaporate_sublimate_precip(t, rho, dv, mu, sc, q, qvl, qvi, &
 
         ! evaporation of rain
         if (qric(i) >= qsmall) then
-
+           call calc_ab(t(i), qvl(i), xxlv, abr)
            eps = 2._r8*pi*n0r(i)*rho(i)*Dv(i)* &
                 (f1r/(lamr(i)*lamr(i))+ &
                 f2r*(arn(i)*rho(i)/mu(i))**0.5_r8* &
                 sc(i)**(1._r8/3._r8)*gamma_half_br_plus5/ &
                 (lamr(i)**(5._r8/2._r8+br/2._r8)))
-
-           pre(i) = eps*(qclr-qvl(i))/abr(i)
+           pre(i) = eps*(qclr-qvl(i))/abr
 
            ! only evaporate in out-of-cloud region
            ! and distribute across precip_frac
@@ -1759,12 +1777,13 @@ subroutine evaporate_sublimate_precip(t, rho, dv, mu, sc, q, qvl, qvi, &
         ! sublimation of snow
         if (qsic(i) >= qsmall) then
            am_evp_st(i) = precip_frac(i) - dum(i)
+           call calc_ab(t(i), qvi(i), xxls, ab)
            eps = 2._r8*pi*n0s(i)*rho(i)*Dv(i)* &
                 (f1s/(lams(i)*lams(i))+ &
                 f2s*(asn(i)*rho(i)/mu(i))**0.5_r8* &
                 sc(i)**(1._r8/3._r8)*gamma_half_bs_plus5/ &
                 (lams(i)**(5._r8/2._r8+bs/2._r8)))
-           prds(i) = eps*(qclr-qvi(i))/ab(i)
+           prds(i) = eps*(qclr-qvi(i))/ab
 
            ! only sublimate in out-of-cloud region and distribute over precip_frac
            prds(i)=min(prds(i)*am_evp_st(i),0._r8)
@@ -1777,7 +1796,7 @@ subroutine evaporate_sublimate_precip(t, rho, dv, mu, sc, q, qvl, qvi, &
         prds(i) = 0._r8
         pre(i) = 0._r8
      end if
-  enddo
+  end do
 
 end subroutine evaporate_sublimate_precip
 
@@ -1836,7 +1855,7 @@ subroutine evaporate_sublimate_precip_graupel(t, rho, dv, mu, sc, q, qvl, qvi, &
   real(r8), dimension(vlen), intent(out) :: am_evp_st ! Fractional area where rain evaporates.
 
   real(r8) :: qclr   ! water vapor mixing ratio in clear air
-  real(r8) :: abr(vlen), ab(vlen), abg(vlen)      ! correction to account for latent heat
+  real(r8) :: abr, ab, abg      ! correction to account for latent heat
   real(r8) :: eps    ! 1/ sat relaxation timescale
 
   real(r8), dimension(vlen) :: dum
@@ -1853,11 +1872,7 @@ subroutine evaporate_sublimate_precip_graupel(t, rho, dv, mu, sc, q, qvl, qvi, &
      else
         dum(i) = lcldm(i)
      end if
-  enddo
-
-  call calc_ab_vect(t, qvl, xxlv, abr, vlen)
-  call calc_ab_vect(t, qvi, xxls, ab, vlen)
-  call calc_ab_vect(t, qvi, xxls, abg, vlen)
+  end do
 
   do i=1,vlen
      ! only calculate if there is some precip fraction > cloud fraction
@@ -1872,14 +1887,13 @@ subroutine evaporate_sublimate_precip_graupel(t, rho, dv, mu, sc, q, qvl, qvi, &
 
         ! evaporation of rain
         if (qric(i) >= qsmall) then
-
+           call calc_ab(t(i), qvl(i), xxlv, abr)
            eps = 2._r8*pi*n0r(i)*rho(i)*Dv(i)* &
                 (f1r/(lamr(i)*lamr(i))+ &
                 f2r*(arn(i)*rho(i)/mu(i))**0.5_r8* &
                 sc(i)**(1._r8/3._r8)*gamma_half_br_plus5/ &
                 (lamr(i)**(5._r8/2._r8+br/2._r8)))
-
-           pre(i) = eps*(qclr-qvl(i))/abr(i)
+           pre(i) = eps*(qclr-qvl(i))/abr
 
            ! only evaporate in out-of-cloud region
            ! and distribute across precip_frac
@@ -1891,12 +1905,13 @@ subroutine evaporate_sublimate_precip_graupel(t, rho, dv, mu, sc, q, qvl, qvi, &
 
         ! sublimation of snow
         if (qsic(i) >= qsmall) then
+           call calc_ab(t(i), qvi(i), xxls, ab)
            eps = 2._r8*pi*n0s(i)*rho(i)*Dv(i)* &
                 (f1s/(lams(i)*lams(i))+ &
                 f2s*(asn(i)*rho(i)/mu(i))**0.5_r8* &
                 sc(i)**(1._r8/3._r8)*gamma_half_bs_plus5/ &
                 (lams(i)**(5._r8/2._r8+bs/2._r8)))
-           prds(i) = eps*(qclr-qvi(i))/ab(i)
+           prds(i) = eps*(qclr-qvi(i))/ab
 
           ! only sublimate in out-of-cloud region and distribute over precip_frac
            prds(i)=min(prds(i)*am_evp_st(i),0._r8)
@@ -1907,12 +1922,13 @@ subroutine evaporate_sublimate_precip_graupel(t, rho, dv, mu, sc, q, qvl, qvi, &
 
         ! add graupel, do the Same with prdg.
         if (qgic(i).ge.qsmall) then
+           call calc_ab(t(i), qvi(i), xxls, abg)
            eps = 2._r8*pi*n0g(i)*rho(i)*Dv(i)*                    &
                 (f1s/(lamg(i)*lamg(i))+                           &
                 f2s*(agn(i)*rho(i)/mu(i))**0.5_r8*                &
                 sc(i)**(1._r8/3._r8)*gamma(5._r8/2._r8+bg/2._r8)/ &
                 (lamg(i)**(5._r8/2._r8+bs/2._r8)))
-           prdg(i) = eps*(qclr-qvi(i))/abg(i)
+           prdg(i) = eps*(qclr-qvi(i))/abg
            
            ! only sublimate in out-of-cloud region and distribute over precip_frac
            prdg(i)=min(prdg(i)*am_evp_st(i),0._r8)
@@ -1963,20 +1979,20 @@ subroutine bergeron_process_snow(t, rho, dv, mu, sc, qvl, qvi, asn, &
   ! Output tendencies
   real(r8), dimension(vlen), intent(out) :: bergs
 
-  real(r8) :: ab(vlen)     ! correction to account for latent heat
+  real(r8) :: ab     ! correction to account for latent heat
   real(r8) :: eps    ! 1/ sat relaxation timescale
 
   integer :: i
 
-  call calc_ab_vect(t, qvi, xxls, ab, vlen)
   do i=1,vlen
      if (qsic(i) >= qsmall.and. qcic(i) >= qsmall .and. t(i) < tmelt) then
+        call calc_ab(t(i), qvi(i), xxls, ab)
         eps = 2._r8*pi*n0s(i)*rho(i)*Dv(i)* &
              (f1s/(lams(i)*lams(i))+ &
              f2s*(asn(i)*rho(i)/mu(i))**0.5_r8* &
              sc(i)**(1._r8/3._r8)*gamma_half_bs_plus5/ &
              (lams(i)**(5._r8/2._r8+bs/2._r8)))
-        bergs(i) = eps*(qvl(i)-qvi(i))/ab(i)
+        bergs(i) = eps*(qvl(i)-qvi(i))/ab
      else
         bergs(i) = 0._r8
      end if
@@ -2002,7 +2018,6 @@ subroutine graupel_collecting_snow(qsic,qric,umr,ums,rho,lamr,n0r,lams,n0s, &
  
   real(r8), dimension(vlen), intent(in) :: rho  ! air density
 
-
   ! Size parameters for rain
   real(r8), dimension(vlen), intent(in) :: lamr
   real(r8), dimension(vlen), intent(in) :: n0r
@@ -2017,15 +2032,15 @@ subroutine graupel_collecting_snow(qsic,qric,umr,ums,rho,lamr,n0r,lams,n0s, &
   integer :: i
 
   cons31=pi*pi*ecr*rhosn
-	
+
   do i=1,vlen
 
      if (qsic(i).ge.0.1e-3_r8 .and. qric(i).ge.0.1e-3_r8) then
-        psacr(i) = cons31*(((1.2_r8*umr(i)-0.95_r8*ums(i))**2+              &
-             0.08_r8*ums(i)*umr(i))**0.5_r8*rho(i)*                     &
-             n0r(i)*n0s(i)/lams(i)**3*                               &
-             (5._r8/(lams(i)**3*lamr(i))+                    &
-             2._r8/(lams(i)**2*lamr(i)**2)+                  &
+        psacr(i) = cons31*(((1.2_r8*umr(i)-0.95_r8*ums(i))**2+  &
+             0.08_r8*ums(i)*umr(i))**0.5_r8*rho(i)*             &
+             n0r(i)*n0s(i)/lams(i)**3*                          &
+             (5._r8/(lams(i)**3*lamr(i))+                       &
+             2._r8/(lams(i)**2*lamr(i)**2)+                     &
              0.5_r8/(lams(i)*lamr(i)**3)))            
      else
         psacr(i) = 0._r8
@@ -2072,19 +2087,19 @@ subroutine graupel_collecting_cld_water(qgic,qcic,ncic,rho,n0g,lamg,bg,agn, &
 
   do i=1,vlen
 
-        if (qgic(i).ge.1.e-8_r8 .and. qcic(i).ge.qsmall) then
+     if (qgic(i).ge.1.e-8_r8 .and. qcic(i).ge.qsmall) then
 
-           psacwg(i) = cons*agn(i)*qcic(i)*rho(i)*               &
-                  n0g(i)/                        &
-                  lamg(i)**(bg+3._r8)
-           npsacwg(i) = cons*agn(i)*ncic(i)*rho(i)*              &
-                  n0g(i)/                        &
-                  lamg(i)**(bg+3._r8)
-        else
-           psacwg(i)=0._r8
-           npsacwg(i)=0._r8
-        end if
-     enddo
+        psacwg(i) = cons*agn(i)*qcic(i)*rho(i)*   &
+               n0g(i)/                            &
+               lamg(i)**(bg+3._r8)
+        npsacwg(i) = cons*agn(i)*ncic(i)*rho(i)*  &
+               n0g(i)/                            &
+               lamg(i)**(bg+3._r8)
+     else
+        psacwg(i)=0._r8
+        npsacwg(i)=0._r8
+     end if
+  end do
 end subroutine graupel_collecting_cld_water
 
 !========================================================================
@@ -2158,7 +2173,7 @@ subroutine graupel_riming_liquid_snow(psacws,qsic,qcic,nsic,rho,rhosn,rhog,asn,l
         nscng(i) = 0._r8
      end if
      
-  enddo
+  end do
 
 end subroutine graupel_riming_liquid_snow
 
@@ -2241,7 +2256,7 @@ subroutine graupel_collecting_rain(qric,qgic,umg,umr,ung,unr,rho,n0r,lamr,n0g,la
         pracg(i)=0._r8
      end if
      
-  enddo
+  end do
 
 end subroutine graupel_collecting_rain
 
