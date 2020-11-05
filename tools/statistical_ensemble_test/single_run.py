@@ -364,7 +364,7 @@ def single_case(opts_dict, case_flags, stat_dir):
     print ('STATUS: no-submit = ' + str(ns))
     if nb == False :
         print("STATUS: building case ...")
-        command = './case.build'
+        command = './case.build  --skip-provenance-check'
         ret = os.system(command)
         if ret != 0:
             print("Error building...")

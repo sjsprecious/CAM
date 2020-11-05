@@ -700,12 +700,6 @@ using a fortran linker.
 <!--    <append DEBUG="FALSE"> -O2 -tp=skylake-64 -Mnofma -acc -ta=tesla:cc70,lineinfo -Minfo=accel </append> -->
     <append DEBUG="FALSE"> -O2 -tp=skylake </append>
   </CFLAGS>
-  <CONFIG_ARGS>
-    <base> --host=Linux </base>
-  </CONFIG_ARGS>
-  <CPPDEFS>
-    <append> -DLINUX </append>
-  </CPPDEFS>
   <FFLAGS>
 <!--    <append DEBUG="FALSE"> -O2 -tp=skylake-64 -Mnofma -acc -ta=tesla:cc70,lineinfo -Minfo=accel </append> -->
     <append DEBUG="FALSE"> -O2 -tp=skylake </append>

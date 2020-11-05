@@ -525,9 +525,10 @@ This allows using a different mpirun command to launch unit tests
     <DESC>NCAR GPU platform, os is Linux, 36 pes/node, batch system is slurm</DESC>
     <NODENAME_REGEX>casper*</NODENAME_REGEX>
     <OS>LINUX</OS>
-    <COMPILERS>pgi</COMPILERS>
+    <COMPILERS>pgi,intel</COMPILERS>
+    <MPILIBS compiler="intel" >openmpi</MPILIBS>
     <MPILIBS compiler="pgi" >openmpi</MPILIBS>
-    <CIME_OUTPUT_ROOT>/glade/scratch/$USER</CIME_OUTPUT_ROOT>
+    <CIME_OUTPUT_ROOT>/glade/scratch/$ENV{USER}</CIME_OUTPUT_ROOT>
     <DIN_LOC_ROOT>$ENV{CESMDATAROOT}/inputdata</DIN_LOC_ROOT>
     <DIN_LOC_ROOT_CLMFORC>/glade/p/cgd/tss/CTSM_datm_forcing_data</DIN_LOC_ROOT_CLMFORC>
     <DOUT_S_ROOT>$CIME_OUTPUT_ROOT/archive/$CASE</DOUT_S_ROOT>
@@ -540,7 +541,7 @@ This allows using a different mpirun command to launch unit tests
     <MAX_MPITASKS_PER_NODE>36</MAX_MPITASKS_PER_NODE>
     <PROJECT_REQUIRED>TRUE</PROJECT_REQUIRED>
     <mpirun mpilib="default">
-      <executable>mpirun</executable>
+      <executable>srun</executable>
       <arguments>
         <arg name="num_tasks"> -np {{ total_tasks }}</arg>
       </arguments>
@@ -557,7 +558,7 @@ This allows using a different mpirun command to launch unit tests
       <init_path lang="sh">/glade/u/apps/dav/opt/lmod/7.7.29/init/sh</init_path>
       <init_path lang="csh">/glade/u/apps/dav/opt/lmod/7.7.29/init/csh</init_path>
       <cmd_path lang="perl">/glade/u/apps/dav/opt/lmod/7.7.29/libexec/lmod perl</cmd_path>
-      <cmd_path lang="python">/glade/u/apps/dav/opt/lmod/7.7.29/libexec/lmod python</cmd_path>
+      <cmd_path lang="python">export MODULEPATH=$MODULEPATH:/glade/u/apps/dav/modulefiles/default/compilers:/glade/u/apps/dav/modulefiles/default/idep:/glade/u/apps/dav/modulefiles/default/pgi/20.4:/glade/u/apps/dav/modulefiles/default/openmpi/4.0.3/pgi/20.4:/glade/u/apps/dav/opt/lmod/7.7.29/modulefiles/Core;/glade/u/apps/dav/opt/lmod/7.7.29/libexec/lmod python</cmd_path>
       <cmd_path lang="sh">module</cmd_path>
       <cmd_path lang="csh">module</cmd_path>
       <modules>
@@ -565,12 +566,14 @@ This allows using a different mpirun command to launch unit tests
       </modules>
       <modules>
         <command name="load">ncarenv/1.3</command>
-        <command name="load">cmake/3.9.4</command>
       </modules>
       <modules compiler="pgi">
         <command name="load">pgi/20.4</command>
       </modules>
-      <modules mpilib="openmpi" compiler="pgi">
+      <modules compiler="intel">
+        <command name="load">intel/19.0.5</command>
+      </modules>
+      <modules mpilib="openmpi">
         <command name="load">openmpi/4.0.3</command>
         <command name="load">netcdf-mpi/4.7.3</command>
         <command name="load">pnetcdf/1.12.1</command>
@@ -582,10 +585,10 @@ This allows using a different mpirun command to launch unit tests
     <environment_variables> 
       <env name="MODULEPATH">/glade/u/apps/dav/modulefiles/default/compilers:/glade/u/apps/dav/modulefiles/default/idep</env>
       <env name="OMP_STACKSIZE">256M</env>
-      <env name="TMPDIR">/glade/scratch/$USER</env> 
+      <env name="TMPDIR">/glade/scratch/$ENV{USER}</env> 
       <env name="CESMDATAROOT">/glade/p/cesmdata/cseg</env>
       <env name="NETCDF_PATH">$ENV{NETCDF}</env>
-    </environment_variables> 
+    </environment_variables>
     <resource_limits>
       <resource name="RLIMIT_STACK">-1</resource>
     </resource_limits>
