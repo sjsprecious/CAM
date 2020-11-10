@@ -1,3 +1,5 @@
+#define VLEN 128
+
 module micro_mg3_0
 !---------------------------------------------------------------------------------
 ! Purpose:
@@ -1283,6 +1285,9 @@ subroutine micro_mg_tend ( &
 
   ! output activated liquid and ice (convert from #/kg -> #/m3)
   !--------------------------------------------------
+
+  !$acc parallel vector_length(VLEN)
+  !$acc loop gang vector collapse(2)
   do k=1,nlev
      do i=1,mgncol
         if (qc(i,k) >= qsmall) then
@@ -1297,9 +1302,9 @@ subroutine micro_mg_tend ( &
         else
            ncai(i,k) = 0._r8
         end if 
-
     end do
   end do
+  !$acc end parallel
 
   !===============================================
 
