@@ -527,7 +527,7 @@ This allows using a different mpirun command to launch unit tests
     <OS>LINUX</OS>
     <COMPILERS>pgi,intel</COMPILERS>
     <MPILIBS compiler="intel" >openmpi</MPILIBS>
-    <MPILIBS compiler="pgi" >openmpi</MPILIBS>
+    <MPILIBS compiler="pgi" >openmpi,mpi-serial</MPILIBS>
     <CIME_OUTPUT_ROOT>/glade/scratch/$ENV{USER}</CIME_OUTPUT_ROOT>
     <DIN_LOC_ROOT>$ENV{CESMDATAROOT}/inputdata</DIN_LOC_ROOT>
     <DIN_LOC_ROOT_CLMFORC>/glade/p/cgd/tss/CTSM_datm_forcing_data</DIN_LOC_ROOT_CLMFORC>
@@ -570,7 +570,6 @@ This allows using a different mpirun command to launch unit tests
       <modules compiler="pgi">
         <command name="load">ncarenv/1.3</command>
         <command name="load">pgi/20.4</command>
-        <command name="load">netcdf/4.7.3</command>
       </modules>
       <modules compiler="intel">
         <command name="load">ncarenv/1.2</command>
@@ -584,7 +583,11 @@ This allows using a different mpirun command to launch unit tests
       </modules>
       <modules mpilib="openmpi" compiler="pgi">
         <command name="load">openmpi/4.0.3</command>
+        <command name="load">netcdf-mpi/4.7.3</command>
         <command name="load">pnetcdf/1.12.1</command>
+      </modules>
+      <modules mpilib="mpi-serial" compiler="pgi">
+        <command name="load">netcdf/4.7.3</command>
       </modules>
       <modules>
         <command name="load">ncarcompilers/0.5.0</command>
