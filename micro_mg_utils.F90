@@ -1,5 +1,7 @@
 module micro_mg_utils
 
+#define VLEN 128
+
 !--------------------------------------------------------------------------
 !
 ! This module contains process rates and utility functions used by the MG
@@ -251,6 +253,8 @@ real(r8) :: gamma_half_br_plus5
 real(r8) :: gamma_half_bs_plus5
 real(r8) :: gamma_2bs_plus2
 
+!$acc declare copyin(rv,cpp,mmult)
+
 !=========================================================
 ! Utilities that are cheaper if the compiler knows that
 ! some argument is an integer.
@@ -381,6 +385,7 @@ end function NewMGHydrometeorProps
 
 ! Use gamma function to implement rising factorial extended to the reals.
 subroutine rising_factorial_r8(x, n, res)
+  !!!$acc routine seq
   real(r8), intent(in) :: x, n
   real(r8), intent(out) :: res
 
@@ -389,6 +394,7 @@ subroutine rising_factorial_r8(x, n, res)
 end subroutine rising_factorial_r8
 
 subroutine rising_factorial_r8_vec(x, n, res,vlen)
+
   integer, intent(in)   :: vlen
   real(r8), intent(in)  :: x(vlen), n
   real(r8), intent(out) :: res(vlen)
@@ -396,12 +402,15 @@ subroutine rising_factorial_r8_vec(x, n, res,vlen)
   real(r8) :: tmp(vlen)
 
 #if defined(__OPENACC__)
+  !!!$acc parallel vector_length(VLEN)
+  !!!$acc loop gang vector
   do i=1,vlen
      tmp(i) = x(i)+n
      res(i) = gamma(tmp(i))
      tmp(i) = gamma(x(i))
      res(i) = res(i)/tmp(i)
   end do
+  !!!$acc end parallel
 #else
   tmp = x+n
   res = gamma(tmp)
@@ -413,6 +422,8 @@ end subroutine rising_factorial_r8_vec
 
 ! Rising factorial can be performed much cheaper if n is a small integer.
 subroutine rising_factorial_integer(x, n, res)
+  !$acc routine seq
+
   real(r8), intent(in)  :: x
   integer,  intent(in)  :: n
   real(r8), intent(out) :: res
@@ -423,6 +434,7 @@ subroutine rising_factorial_integer(x, n, res)
   res = 1._r8
   factor = x
 
+  !$acc loop seq
   do i = 1, n
      res = res * factor
      factor = factor + 1._r8
@@ -431,6 +443,7 @@ subroutine rising_factorial_integer(x, n, res)
 end subroutine rising_factorial_integer
 
 subroutine rising_factorial_integer_vec(x, n, res,vlen)
+
   integer,  intent(in)  :: vlen
   real(r8), intent(in)  :: x(vlen)
   integer,  intent(in)  :: n
@@ -439,12 +452,15 @@ subroutine rising_factorial_integer_vec(x, n, res,vlen)
   integer  :: i,j
   real(r8) :: factor(vlen)
 
+  !$acc parallel vector_length(VLEN)
+  !$acc loop gang vector
   do i=1,vlen
      res(i)    = 1._r8
      factor(i) = x(i)
   end do
 
   if (n == 3) then
+    !$acc loop gang vector
     do i=1,vlen
        res(i)    = res(i) * factor(i)
        factor(i) = factor(i) + 1._r8
@@ -453,24 +469,30 @@ subroutine rising_factorial_integer_vec(x, n, res,vlen)
        res(i)    = res(i) * factor(i)
     end do
   elseif (n == 2) then
+    !$acc loop gang vector
     do i=1,vlen
        res(i)    = res(i) * factor(i)
        factor(i) = factor(i) + 1._r8
        res(i)    = res(i) * factor(i)
     end do
   else
+    !$acc loop seq
     do j = 1, n
+       !$acc loop gang vector
        do i = 1, vlen
           res(i)    = res(i) * factor(i)
           factor(i) = factor(i) + 1._r8
        end do
     end do
   end if
+  !$acc end parallel
 
 end subroutine rising_factorial_integer_vec
 
 ! Calculate correction due to latent heat for evaporation/sublimation
 subroutine calc_ab_line(t, qv, xxl, ab)
+  !$acc routine seq
+
   real(r8), intent(in)  :: t     ! Temperature
   real(r8), intent(in)  :: qv    ! Saturation vapor pressure
   real(r8), intent(in)  :: xxl   ! Latent heat
@@ -485,6 +507,7 @@ end subroutine calc_ab_line
 
 ! Calculate correction due to latent heat for evaporation/sublimation
 subroutine calc_ab_vect(t, qv, xxl, ab, vlen)
+
   integer,  intent(in) :: vlen
   real(r8), intent(in) :: t(vlen)     ! Temperature
   real(r8), intent(in) :: qv(vlen)    ! Saturation vapor pressure
@@ -494,15 +517,20 @@ subroutine calc_ab_vect(t, qv, xxl, ab, vlen)
   real(r8) :: dqsdt(vlen)
   integer :: i
 
+  !$acc parallel vector_length(VLEN)
+  !$acc loop gang vector
   do i=1,vlen
      dqsdt(i) = xxl*qv(i) / (rv * t(i)**2)
      ab(i) = 1._r8 + dqsdt(i)*xxl/cpp
   end do
+  !$acc end parallel
 
 end subroutine calc_ab_vect
 
 ! get cloud droplet size distribution parameters
 subroutine size_dist_param_liq_line(props, qcic, ncic, rho, pgam, lamc)
+  !!!$acc routine seq
+
   type(MGHydrometeorProps), intent(in)    :: props
   real(r8),                 intent(in)    :: qcic
   real(r8),                 intent(inout) :: ncic
@@ -570,6 +598,8 @@ subroutine size_dist_param_liq_vect(props, qcic, ncic, rho, pgam, lamc, vlen)
 
   cnt = COUNT(qcic>qsmall)
   if(cnt>0) then
+    !!!$acc parallel vector_length(VLEN)
+    !!!$acc loop gang vector
     do i=1,vlen
        if (qcic(i) > qsmall) then
           ! Get pgam from fit Rotstayn and Liu 2003 (changed from Martin 1994 for CAM6)
@@ -579,6 +609,8 @@ subroutine size_dist_param_liq_vect(props, qcic, ncic, rho, pgam, lamc, vlen)
           pgamp1(i) = pgam(i)+1._r8
        end if
     end do
+    !!!$acc end parallel
+
     ! Set coefficient for use in size_dist_param_basic.
     ! The 3D case is so common and optimizable that we specialize
     ! it:
@@ -588,6 +620,8 @@ subroutine size_dist_param_liq_vect(props, qcic, ncic, rho, pgam, lamc, vlen)
        call rising_factorial(pgamp1, props%eff_dim,tmp,vlen)
     end if
 
+    !$acc parallel vector_length(VLEN)
+    !$acc loop gang vector
     do i=1,vlen
        if (qcic(i) > qsmall) then
           shapeC(i) = pi / 6._r8 * props%rho * tmp(i)
@@ -596,9 +630,13 @@ subroutine size_dist_param_liq_vect(props, qcic, ncic, rho, pgam, lamc, vlen)
           ubnd(i)   = pgamp1(i)*1._r8/2.e-6_r8
        end if
     end do
+    !$acc end parallel 
+
     call size_dist_param_basic(props, qcic, ncic, shapeC, lbnd, ubnd, lamc, vlen)
   end if
 
+  !$acc parallel vector_length(VLEN)
+  !$acc loop gang vector
   do i=1,vlen
      if (qcic(i) <= qsmall) then
         ! pgam not calculated in this case, so set it to a value likely to
@@ -608,11 +646,14 @@ subroutine size_dist_param_liq_vect(props, qcic, ncic, rho, pgam, lamc, vlen)
         lamc(i) = 0._r8
      end if
   end do
+  !$acc end parallel
 
 end subroutine size_dist_param_liq_vect
 
 ! Basic routine for getting size distribution parameters.
 subroutine size_dist_param_basic_line(props, qic, nic, lam, n0)
+  !$acc routine seq
+
   type(MGHydrometeorProps), intent(in)    :: props
   real(r8),                 intent(in)    :: qic
   real(r8),                 intent(inout) :: nic
@@ -668,6 +709,8 @@ subroutine size_dist_param_basic_vect(props, qic, nic, lam, vlen, n0)
   ubnd      = props%lambda_bounds(2)
   minMass   = props%min_mean_mass
 
+  !!!$acc parallel vector_length(VLEN)
+  !!!$acc loop gang vector 
   do i=1,vlen
 
      if (qic(i) > qsmall) then
@@ -698,10 +741,12 @@ subroutine size_dist_param_basic_vect(props, qic, nic, lam, vlen, n0)
   end do
 
   if (present(n0)) then
+     !!!$acc loop gang vector
      do i = 1, vlen
         n0(i) = nic(i) * lam(i)
      end do
   end if
+  !!!$acc end parallel
 
 end subroutine size_dist_param_basic_vect
 
@@ -722,6 +767,8 @@ subroutine size_dist_param_basic_vect2(props, qic, nic, shapeC,lbnd,ubnd, lam, v
   effDim        = props%eff_dim
   minMass       = props%min_mean_mass
 
+  !!!$acc parallel vector_length(VLEN)
+  !!!$acc loop gang vector
   do i=1,vlen
 
      if (qic(i) > qsmall) then
@@ -751,10 +798,12 @@ subroutine size_dist_param_basic_vect2(props, qic, nic, shapeC,lbnd,ubnd, lam, v
   end do
 
   if (present(n0)) then
+     !!!$acc loop gang vector
      do i = 1,vlen
         n0(i) = nic(i) * lam(i)
      end do
   end if
+  !!!$acc end parallel
 
 end subroutine size_dist_param_basic_vect2
 
@@ -772,6 +821,7 @@ real(r8) elemental function avg_diameter(q, n, rho_air, rho_sub)
 end function avg_diameter
 
 subroutine avg_diameter_vec (q, n, rho_air, rho_sub, avg_diameter, vlen)
+
    ! Finds the average diameter of particles given their density, and
    ! mass/number concentrations in the air.
    ! Assumes that diameter follows an exponential distribution.
@@ -783,13 +833,18 @@ subroutine avg_diameter_vec (q, n, rho_air, rho_sub, avg_diameter, vlen)
    real(r8), intent(out) :: avg_diameter(vlen)
    integer :: i
 
+   !$acc parallel vector_length(VLEN)
+   !$acc loop gang vector
    do i=1,vlen
       avg_diameter(i) = (q(i)*rho_air(i)/(pi * rho_sub * n(i)))**(1._r8/3._r8)
    end do
+   !$acc end parallel
 
 end subroutine avg_diameter_vec
 
 subroutine var_coef_r8(relvar, a, res)
+!!  !$acc routine seq
+
   ! Finds a coefficient for process rates based on the relative variance
   ! of cloud water.
   real(r8), intent(in)  :: relvar
@@ -802,6 +857,7 @@ subroutine var_coef_r8(relvar, a, res)
 end subroutine var_coef_r8
 
 subroutine var_coef_r8_vect(relvar, a, res, vlen)
+
   ! Finds a coefficient for process rates based on the relative variance
   ! of cloud water.
   integer,  intent(in)  :: vlen
@@ -812,13 +868,18 @@ subroutine var_coef_r8_vect(relvar, a, res, vlen)
   real(r8) :: tmpA(vlen)
 
    call rising_factorial(relvar,a,tmpA,vlen)
+!!   !$acc parallel vector_length(VLEN)
+!!   !$acc loop gang vector
    do i=1,vlen
       res(i) = tmpA(i)/relvar(i)**a
    end do
+!!   !$acc end parallel
 
 end subroutine var_coef_r8_vect
 
 subroutine var_coef_integer(relvar, a, res)
+  !$acc routine seq
+
   ! Finds a coefficient for process rates based on the relative variance
   ! of cloud water.
   real(r8), intent(in) :: relvar
@@ -831,6 +892,7 @@ subroutine var_coef_integer(relvar, a, res)
 end subroutine var_coef_integer
 
 subroutine var_coef_integer_vect(relvar, a, res, vlen)
+
   ! Finds a coefficient for process rates based on the relative variance
   ! of cloud water.
   integer, intent(in)   :: vlen
@@ -841,9 +903,12 @@ subroutine var_coef_integer_vect(relvar, a, res, vlen)
   real(r8) :: tmp(vlen)
 
   call rising_factorial(relvar, a,tmp,vlen)
+  !$acc parallel vector_length(VLEN)
+  !$acc loop gang vector
   do i=1,vlen
      res(i) = tmp(i) / relvar(i)**a
   end do
+  !$acc end parallel
 
 end subroutine var_coef_integer_vect
 
@@ -890,6 +955,8 @@ subroutine ice_deposition_sublimation(t, qv, qi, ni, &
 
   !GET IN-CLOUD qi, ni
   !===============================================
+  !$acc parallel vector_length(VLEN)
+  !$acc loop gang vector
   do i = 1,vlen
      if (qi(i)>=qsmall) then
         qiic(i) = qi(i)/icldm(i)
@@ -898,12 +965,16 @@ subroutine ice_deposition_sublimation(t, qv, qi, ni, &
         call calc_ab(t(i), qvi(i), xxls, ab(i))
      end if
   end do
+  !$acc end parallel
 
   !Compute linearized condensational heating correction
 !  call calc_ab(t, qvi, xxls, ab, vlen)
+
   !Get slope and intercept of gamma distn for ice.
   call size_dist_param_basic_vect(mg_ice_props, qiic, niic, lami, vlen, n0i)
 
+  !$acc parallel vector_length(VLEN)
+  !$acc loop gang vector private(epsi)
   do i=1,vlen
      if (qi(i)>=qsmall) then
 
@@ -940,6 +1011,8 @@ subroutine ice_deposition_sublimation(t, qv, qi, ni, &
         ice_sublim(i)=0._r8
      end if !qi>qsmall
   end do
+  !$acc end parallel
+
 end subroutine ice_deposition_sublimation
 
 !========================================================================
@@ -970,11 +1043,16 @@ subroutine kk2000_liq_autoconversion(microp_uniform, qcic, &
   if (.not. microp_uniform) then
      call var_coef(relvar, 2.47_r8, prc_coef,vlen)
   else
+     !$acc parallel vector_length(VLEN)
+     !$acc loop gang vector
      do i = 1,vlen
         prc_coef(i) = 1._r8
      end do
+     !$acc end parallel
   end if
 
+!!  !$acc parallel vector_length(VLEN)
+!!  !$acc loop gang vector
   do i=1,vlen
      if (qcic(i) >= icsmall) then
         ! nprc is increase in rain number conc due to autoconversion
@@ -993,6 +1071,8 @@ subroutine kk2000_liq_autoconversion(microp_uniform, qcic, &
         nprc1(i)=0._r8
      end if
   end do
+!!  !$acc end parallel
+
 end subroutine kk2000_liq_autoconversion
   
   !========================================================================
@@ -1035,6 +1115,8 @@ subroutine sb2001v2_liq_autoconversion(pgam,qc,nc,qr,rho,relvar,au,nprc,nprc1,vl
   real(r8) :: dum, dum1, nu, pra_coef
   integer :: dumi, i
 
+!!  !$acc parallel vector_length(VLEN)
+!!  !$acc loop gang vector private(dumi,nu,dum,dum1)
   do i=1,vlen
 
      if (qc(i) > qsmall) then
@@ -1059,6 +1141,7 @@ subroutine sb2001v2_liq_autoconversion(pgam,qc,nc,qr,rho,relvar,au,nprc,nprc1,vl
      end if
   
   end do
+!!  !$acc end parallel
 
   end subroutine sb2001v2_liq_autoconversion 
   
@@ -1093,6 +1176,8 @@ subroutine sb2001v2_accre_cld_water_rain(qc,nc,qr,rho,relvar,pra,npra,vlen)
 
   ! accretion
 
+!!  !$acc parallel vector_length(VLEN)
+!!  !$acc loop gang vector private(dum,dum1)
   do i =1,vlen
 
     if (qc(i) > qsmall) then
@@ -1107,6 +1192,7 @@ subroutine sb2001v2_accre_cld_water_rain(qc,nc,qr,rho,relvar,pra,npra,vlen)
     end if 
   
   end do
+!!  !$acc end parallel
  
   end subroutine sb2001v2_accre_cld_water_rain   
 
@@ -1135,6 +1221,8 @@ subroutine ice_autoconversion(t, qiic, lami, n0i, dcs, prci, nprci, vlen)
   real(r8) :: d_rat
   integer :: i
 
+!!  !$acc parallel vector_length(VLEN)
+!!  !$acc loop gang vector private(d_rat,m_ip)
   do i=1,vlen
      if (t(i) <= tmelt .and. qiic(i) >= qsmall) then
 
@@ -1156,6 +1244,8 @@ subroutine ice_autoconversion(t, qiic, lami, n0i, dcs, prci, nprci, vlen)
         nprci(i) = 0._r8
      end if
   end do
+!!  !$acc end parallel
+
 end subroutine ice_autoconversion
 
 ! immersion freezing (Bigg, 1953)
@@ -1193,11 +1283,16 @@ subroutine immersion_freezing(microp_uniform, t, pgam, lamc, &
   if (.not. microp_uniform) then
      call var_coef(relvar, 2, dum, vlen)
   else
+!!     !$acc parallel vector_length(VLEN)
+!!     !$acc loop gang vector
      do i =1,vlen
         dum(i) = 1._r8
      end do
+!!     !$acc end parallel
   end if
 
+!!  !$acc parallel vector_length(VLEN)
+!!  !$acc loop gang vector private(tmp)
   do i=1,vlen
 
      if (qcic(i) >= qsmall .and. t(i) < 269.15_r8) then
@@ -1217,6 +1312,7 @@ subroutine immersion_freezing(microp_uniform, t, pgam, lamc, &
         nnuccc(i) = 0._r8
      end if ! qcic > qsmall and t < 4 deg C
   end do
+!!  !$acc end parallel
 
 end subroutine immersion_freezing
 
@@ -1268,6 +1364,8 @@ subroutine contact_freezing (microp_uniform, t, p, rndst, nacon, &
 
   integer  :: i, j
 
+!!  !$acc parallel vector_length(VLEN)
+!!  !$acc loop gang vector private(dum,dum1,tcnt,viscosity,mfp,contact_factor,tmp)
   do i = 1, vlen
 
         if (qcic(i) >= qsmall .and. t(i) < 269.15_r8) then
@@ -1309,6 +1407,7 @@ subroutine contact_freezing (microp_uniform, t, p, rndst, nacon, &
         end if ! qcic > qsmall and t < -4 deg C
 
   end do
+!!  !$acc end parallel
 
 end subroutine contact_freezing
 
@@ -1335,6 +1434,8 @@ subroutine snow_self_aggregation(t, rho, asn, rhosn, qsic, nsic, nsagg, vlen)
 
   integer :: i
 
+!!  !$acc parallel vector_length(VLEN)
+!!  !$acc loop gang vector
   do i=1,vlen
      if (qsic(i) >= qsmall .and. t(i) <= tmelt) then
         nsagg(i) = -1108._r8*eii/(4._r8*720._r8*rhosn)*asn(i)*qsic(i)*nsic(i)*rho(i)*&
@@ -1343,6 +1444,8 @@ subroutine snow_self_aggregation(t, rho, asn, rhosn, qsic, nsic, nsagg, vlen)
         nsagg(i)=0._r8
      end if
   end do
+!!  !$acc end parallel
+
 end subroutine snow_self_aggregation
 
 ! accretion of cloud droplets onto snow/graupel
@@ -1391,6 +1494,8 @@ subroutine accrete_cloud_water_snow(t, rho, asn, uns, mu, qcic, ncic, qsic, &
 
   ! ignore collision of snow with droplets above freezing
 
+!!  !$acc parallel vector_length(VLEN)
+!!  !$acc loop gang vector private(dc0,dum,eci,accrete_rate)
   do i=1,vlen
      if (qsic(i) >= qsmall .and. t(i) <= tmelt .and. qcic(i) >= qsmall) then
 
@@ -1416,6 +1521,8 @@ subroutine accrete_cloud_water_snow(t, rho, asn, uns, mu, qcic, ncic, qsic, &
         npsacws(i) = 0._r8
      end if
   end do
+!!  !$acc end parallel
+
 end subroutine accrete_cloud_water_snow
 
 ! add secondary ice production due to accretion of droplets by snow
@@ -1435,6 +1542,8 @@ subroutine secondary_ice_production(t, psacws, msacwi, nsacwi, vlen)
   real(r8), dimension(vlen), intent(out) :: nsacwi ! Number
   integer :: i
 
+  !$acc parallel vector_length(VLEN)
+  !$acc loop gang vector
   do i=1,vlen
      if((t(i) < 270.16_r8) .and. (t(i) >= 268.16_r8)) then
         nsacwi(i) = 3.5e8_r8*(270.16_r8-t(i))/2.0_r8*psacws(i)
@@ -1445,10 +1554,13 @@ subroutine secondary_ice_production(t, psacws, msacwi, nsacwi, vlen)
      end if
   end do
 
+  !$acc loop gang vector
   do i=1,vlen
      msacwi(i) = min(nsacwi(i)*mi0, psacws(i))
      psacws(i) = psacws(i) - msacwi(i)
   end do
+  !$acc end parallel
+
 end subroutine secondary_ice_production
 
 ! accretion of rain water by snow
@@ -1496,6 +1608,8 @@ subroutine accrete_rain_snow(t, rho, umr, ums, unr, uns, qric, qsic, &
   real(r8) :: common_factor
   integer :: i
 
+!!  !$acc parallel vector_length(VLEN)
+!!  !$acc loop gang vector private(common_factor,d_rat)
   do i=1,vlen
      if (qric(i) >= icsmall .and. qsic(i) >= icsmall .and. t(i) <= tmelt) then
 
@@ -1516,6 +1630,8 @@ subroutine accrete_rain_snow(t, rho, umr, ums, unr, uns, qric, qsic, &
         npracs(i) = 0._r8
      end if
   end do
+!!  !$acc end parallel
+
 end subroutine accrete_rain_snow
 
 ! heterogeneous freezing of rain drops
@@ -1537,6 +1653,8 @@ subroutine heterogeneous_rain_freezing(t, qric, nric, lamr, mnuccr, nnuccr, vlen
   real(r8), dimension(vlen), intent(out) :: nnuccr ! Number
   integer :: i
 
+!!  !$acc parallel vector_length(VLEN)
+!!  !$acc loop gang vector
   do i=1,vlen
 
      if (t(i) < 269.15_r8 .and. qric(i) >= qsmall) then
@@ -1550,6 +1668,8 @@ subroutine heterogeneous_rain_freezing(t, qric, nric, lamr, mnuccr, nnuccr, vlen
         nnuccr(i) = 0._r8
      end if
   end do
+!!  !$acc end parallel
+
 end subroutine heterogeneous_rain_freezing
 
 ! accretion of cloud liquid water by rain
@@ -1584,15 +1704,23 @@ subroutine accrete_cloud_water_rain(microp_uniform, qric, qcic, &
 
   if (.not. microp_uniform) then
     call var_coef(relvar, 1.15_r8, pra_coef, vlen)
+    !$acc parallel vector_length(VLEN)
+    !$acc loop gang vector
     do i = 1, vlen
        pra_coef(i) = accre_enhan(i) * pra_coef(i)
     end do
+    !$acc end parallel
   else
+    !$acc parallel vector_length(VLEN)
+    !$acc loop gang vector
     do i = 1, vlen
        pra_coef(i) = 1._r8
     end do
+    !$acc end parallel
   end if
 
+!!  !$acc parallel vector_length(VLEN)
+!!  !$acc loop gang vector
   do i=1,vlen
      if (qric(i) >= qsmall .and. qcic(i) >= qsmall) then
        ! include sub-grid distribution of cloud water
@@ -1603,6 +1731,8 @@ subroutine accrete_cloud_water_rain(microp_uniform, qric, qcic, &
        npra(i) = 0._r8
      end if
   end do
+!!  !$acc end parallel
+
 end subroutine accrete_cloud_water_rain
 
 ! Self-collection of rain drops
@@ -1623,6 +1753,8 @@ subroutine self_collection_rain(rho, qric, nric, nragg, vlen)
 
   integer :: i
 
+  !$acc parallel vector_length(VLEN)
+  !$acc loop gang vector
   do i=1,vlen
      if (qric(i) >= qsmall) then
         nragg(i) = -8._r8*nric(i)*qric(i)*rho(i)
@@ -1630,6 +1762,8 @@ subroutine self_collection_rain(rho, qric, nric, nragg, vlen)
         nragg(i) = 0._r8
      end if
   end do
+  !$acc end parallel
+
 end subroutine self_collection_rain
 
 
@@ -1666,6 +1800,8 @@ subroutine accrete_cloud_ice_snow(t, rho, asn, qiic, niic, qsic, &
 
   integer :: i
 
+!!  !$acc parallel vector_length(VLEN)
+!!  !$acc loop gang vector private(accrete_rate)
   do i=1,vlen
      if (qsic(i) >= qsmall .and. qiic(i) >= qsmall .and. t(i) <= tmelt) then
         accrete_rate = pi/4._r8 * eii * asn(i) * rho(i) * n0s(i) * gamma_bs_plus3/ &
@@ -1677,6 +1813,8 @@ subroutine accrete_cloud_ice_snow(t, rho, asn, qiic, niic, qsic, &
         nprai(i) = 0._r8
      end if
   end do
+!!  !$acc end parallel
+
 end subroutine accrete_cloud_ice_snow
 
 ! calculate evaporation/sublimation of rain and snow
@@ -1736,6 +1874,9 @@ subroutine evaporate_sublimate_precip(t, rho, dv, mu, sc, q, qvl, qvi, &
   ! set temporary cloud fraction to zero if cloud water + ice is very small
   ! this will ensure that evaporation/sublimation of precip occurs over
   ! entire grid cell, since min cloud fraction is specified otherwise
+
+!!  !$acc parallel vector_length(VLEN)
+!!  !$acc loop gang vector
   do i=1,vlen
      am_evp_st(i) = 0._r8
      if (qcic(i)+qiic(i) < 1.e-6_r8) then
@@ -1745,6 +1886,7 @@ subroutine evaporate_sublimate_precip(t, rho, dv, mu, sc, q, qvl, qvi, &
      end if
   end do
 
+!!  !$acc loop gang vector private(qclr,eps)
   do i=1,vlen
   ! only calculate if there is some precip fraction > cloud fraction
 
@@ -1797,6 +1939,7 @@ subroutine evaporate_sublimate_precip(t, rho, dv, mu, sc, q, qvl, qvi, &
         pre(i) = 0._r8
      end if
   end do
+!!  !$acc end parallel
 
 end subroutine evaporate_sublimate_precip
 
@@ -1865,6 +2008,9 @@ subroutine evaporate_sublimate_precip_graupel(t, rho, dv, mu, sc, q, qvl, qvi, &
   ! set temporary cloud fraction to zero if cloud water + ice is very small
   ! this will ensure that evaporation/sublimation of precip occurs over
   ! entire grid cell, since min cloud fraction is specified otherwise
+
+!!  !$acc parallel vector_length(VLEN)
+!!  !$acc loop gang vector
   do i=1,vlen
      am_evp_st(i) = 0._r8
      if (qcic(i)+qiic(i) < 1.e-6_r8) then
@@ -1874,6 +2020,7 @@ subroutine evaporate_sublimate_precip_graupel(t, rho, dv, mu, sc, q, qvl, qvi, &
      end if
   end do
 
+!!  !$acc loop gang vector private(qclr,eps)
   do i=1,vlen
      ! only calculate if there is some precip fraction > cloud fraction
      if (precip_frac(i) > dum(i)) then
@@ -1945,6 +2092,7 @@ subroutine evaporate_sublimate_precip_graupel(t, rho, dv, mu, sc, q, qvl, qvi, &
 
      end if
   end do
+!!  !$acc end parallel
 
 end subroutine evaporate_sublimate_precip_graupel
 
@@ -1984,6 +2132,8 @@ subroutine bergeron_process_snow(t, rho, dv, mu, sc, qvl, qvi, asn, &
 
   integer :: i
 
+!!  !$acc parallel vector_length(VLEN)
+!!  !$acc loop gang vector private(eps,ab)
   do i=1,vlen
      if (qsic(i) >= qsmall.and. qcic(i) >= qsmall .and. t(i) < tmelt) then
         call calc_ab(t(i), qvi(i), xxls, ab)
@@ -1997,6 +2147,8 @@ subroutine bergeron_process_snow(t, rho, dv, mu, sc, qvl, qvi, asn, &
         bergs(i) = 0._r8
      end if
   end do
+!!  !$acc end parallel
+
 end subroutine bergeron_process_snow
 
 !========================================================================
@@ -2033,6 +2185,8 @@ subroutine graupel_collecting_snow(qsic,qric,umr,ums,rho,lamr,n0r,lams,n0s, &
 
   cons31=pi*pi*ecr*rhosn
 
+!!  !$acc parallel vector_length(VLEN)
+!!  !$acc loop gang vector
   do i=1,vlen
 
      if (qsic(i).ge.0.1e-3_r8 .and. qric(i).ge.0.1e-3_r8) then
@@ -2047,6 +2201,7 @@ subroutine graupel_collecting_snow(qsic,qric,umr,ums,rho,lamr,n0r,lams,n0s, &
      end if
 
   end do
+!!  !$acc end parallel
 
 end subroutine graupel_collecting_snow
 
@@ -2085,6 +2240,8 @@ subroutine graupel_collecting_cld_water(qgic,qcic,ncic,rho,n0g,lamg,bg,agn, &
 
   cons = gamma(bg + 3._r8)*pi/4._r8 * ecid
 
+!!  !$acc parallel vector_length(VLEN)
+!!  !$acc loop gang vector
   do i=1,vlen
 
      if (qgic(i).ge.1.e-8_r8 .and. qcic(i).ge.qsmall) then
@@ -2100,6 +2257,8 @@ subroutine graupel_collecting_cld_water(qgic,qcic,ncic,rho,n0g,lamg,bg,agn, &
         npsacwg(i)=0._r8
      end if
   end do
+!!  !$acc end parallel
+
 end subroutine graupel_collecting_cld_water
 
 !========================================================================
@@ -2145,9 +2304,11 @@ subroutine graupel_riming_liquid_snow(psacws,qsic,qcic,nsic,rho,rhosn,rhog,asn,l
 
   rhosu = 85000._r8/(ra * tmelt)    ! typical air density at 850 mb
 
-  do i=1,vlen
+  cons  = 4._r8 *2._r8 *3._r8*rhosu*pi*ecid*ecid*gamma_2bs_plus2/(8._r8*(rhog-rhosn))
 
-      cons=4._r8 *2._r8 *3._r8 *rhosu*pi*ecid*ecid*gamma_2bs_plus2/(8._r8*(rhog-rhosn))
+!!  !$acc parallel vector_length(VLEN)
+!!  !$acc loop gang vector private(dum)
+  do i=1,vlen
       
 ! Only allow conversion if qni > 0.1 and qc > 0.5 g/kg following Rutledge and Hobbs (1984)
      if (psacws(i).gt.0._r8 .and. qsic(i).GE.0.1e-3_r8 .AND. qcic(i).GE.0.5E-3_r8) then
@@ -2174,6 +2335,7 @@ subroutine graupel_riming_liquid_snow(psacws,qsic,qcic,nsic,rho,rhosn,rhog,asn,l
      end if
      
   end do
+!!  !$acc end parallel
 
 end subroutine graupel_riming_liquid_snow
 
@@ -2225,6 +2387,8 @@ subroutine graupel_collecting_rain(qric,qgic,umg,umr,ung,unr,rho,n0r,lamr,n0g,la
   cons41=pi*pi*ecr*rhow
   cons32=pi/2._r8*ecr
 
+!!  !$acc parallel vector_length(VLEN)
+!!  !$acc loop gang vector private(dum)
   do i=1,vlen
 
      if (qric(i).ge.1.e-8_r8.and.qgic(i).ge.1.e-8_r8) then
@@ -2257,6 +2421,7 @@ subroutine graupel_collecting_rain(qric,qgic,umg,umr,ung,unr,rho,n0r,lamr,n0g,la
      end if
      
   end do
+!!  !$acc end parallel
 
 end subroutine graupel_collecting_rain
 
@@ -2307,6 +2472,8 @@ subroutine graupel_rain_riming_snow(pracs,npracs,psacr,qsic,qric,nric,nsic,n0s,l
   cons18=rhosn*rhosn
   cons19=rhow*rhow
 
+!!  !$acc parallel vector_length(VLEN)
+!!  !$acc loop gang vector private(dum)
   do i=1,vlen
      
      fmult=0._r8
@@ -2337,6 +2504,7 @@ subroutine graupel_rain_riming_snow(pracs,npracs,psacr,qsic,qric,nric,nsic,n0s,l
         ngracs(i) = 0._r8
      end if
   end do 
+!!  !$acc end parallel
 
 end subroutine graupel_rain_riming_snow
 
@@ -2380,6 +2548,9 @@ subroutine graupel_rime_splintering(t,qcic,qric,qgic,psacwg,pracg,&
 
 !nmultg,qmultg                                                                             .
 !========================================================================
+
+  !$acc parallel vector_length(VLEN)
+  !$acc loop gang vector private(fmult)
   do i=1,vlen
 
      nmultrg(i)=0._r8
@@ -2439,6 +2610,7 @@ subroutine graupel_rime_splintering(t,qcic,qric,qgic,psacwg,pracg,&
         end if
      end if
   end do
+  !$acc end parallel
 
 end subroutine graupel_rime_splintering
 
@@ -2454,6 +2626,8 @@ pure function no_limiter()
 end function no_limiter
 
 pure function limiter_is_on(lim)
+  !$acc routine seq
+
   real(r8), intent(in) :: lim
   logical :: limiter_is_on
 
