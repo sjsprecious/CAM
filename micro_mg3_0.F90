@@ -1030,8 +1030,8 @@ subroutine micro_mg_tend ( &
 !!  !$acc      copyout(rho,dv,mu,sc,rhof,arn,asn,agn,acn,ain,ajn)
 !!
 
-!!  !$acc parallel vector_length(VLEN)
-!!  !$acc loop gang vector collapse(2)
+  !$acc parallel vector_length(VLEN)
+  !$acc loop gang vector collapse(2)
   do k=1,nlev
     do i=1,mgncol
        rho(i,k) = p(i,k)/(r*t(i,k))
@@ -1060,7 +1060,9 @@ subroutine micro_mg_tend ( &
        ajn(i,k)=aj*(rhosu/rho(i,k))**0.35_r8
     end do
   end do
-!!  !$acc end parallel
+  !$acc compare(rho(1:mgncol,1:nlev),dv(1:mgncol,1:nlev))
+  !$acc end parallel
+
 !!  !$acc end data
 
   !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
