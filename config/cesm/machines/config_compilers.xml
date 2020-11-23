@@ -720,7 +720,7 @@ using a fortran linker.
     <append> -I$(EXEROOT)/ocn/obj/FMS </append>
   </FFLAGS>
   <LDFLAGS>
-    <append DEBUG="FALSE"> -O -tp=skylake -acc -ta=tesla:cc70,lineinfo </append>
+    <append DEBUG="FALSE"> -O -tp=skylake -acc -ta=tesla:cc70,lineinfo,autocompare </append>
   </LDFLAGS>
   <NETCDF_PATH> $ENV{NETCDF}</NETCDF_PATH>
   <PIO_FILESYSTEM_HINTS>glade</PIO_FILESYSTEM_HINTS>
