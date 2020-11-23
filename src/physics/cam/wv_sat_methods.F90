@@ -27,6 +27,8 @@ module wv_sat_methods
 ! wrap the function so that it can be given an explicit (non-
 ! elemental) interface.
 
+#define VLEN 128
+
 implicit none
 private
 save
@@ -52,6 +54,8 @@ integer, parameter :: Bolton_idx = 3
 ! Index representing the current default scheme.
 integer, parameter :: initial_default_idx = GoffGratch_idx
 integer :: default_idx = initial_default_idx
+
+!!!!$acc declare copyin(epsilo, tmelt, tboil, default_idx, omeps, h2otrip)
 
 public wv_sat_methods_init
 public wv_sat_get_scheme_idx
@@ -203,7 +207,13 @@ subroutine  wv_sat_svp_to_qsat_vect(es, p, qs, vlen)
   real(r8), intent(in)  :: p(vlen)   ! Current pressure.
   real(r8), intent(out) :: qs(vlen)
   integer :: i
+
   ! If pressure is less than SVP, set qs to maximum of 1.
+
+  !$acc declare present_or_copyin(epsilo,omeps)
+
+  !$acc parallel vector_length(VLEN)
+  !$acc loop gang vector
   do i=1,vlen
      if ( (p(i) - es(i)) <= 0._r8 ) then
         qs(i) = 1.0_r8
@@ -211,6 +221,7 @@ subroutine  wv_sat_svp_to_qsat_vect(es, p, qs, vlen)
         qs(i) = epsilo*es(i) / (p(i) - omeps*es(i))
      end if
   end do
+  !$acc end parallel
 
 end subroutine wv_sat_svp_to_qsat_vect
 
@@ -259,10 +270,14 @@ subroutine wv_sat_qsat_water_vect(t, p, es, qs, vlen, idx)
 
   call wv_sat_svp_water_vect(t, es, vlen, idx)
   call wv_sat_svp_to_qsat_vect(es, p, qs, vlen)
+
+  !$acc parallel vector_length(VLEN)
+  !$acc loop gang vector
   do i=1,vlen
      ! Ensures returned es is consistent with limiters on qs.
      es(i) = min(es(i), p(i))
-  enddo
+  end do
+  !$acc end parallel
 
 end subroutine wv_sat_qsat_water_vect
 
@@ -311,10 +326,14 @@ subroutine wv_sat_qsat_ice_vect(t, p, es, qs, vlen, idx)
 
   call wv_sat_svp_ice_vect(t, es, vlen, idx)
   call wv_sat_svp_to_qsat_vect(es, p, qs, vlen)
+
+  !$acc parallel vector_length(VLEN)
+  !$acc loop gang vector
   do i=1,vlen
      ! Ensures returned es is consistent with limiters on qs.
      es(i) = min(es(i), p(i))
-  enddo
+  end do
+  !$acc end parallel
 
 end subroutine wv_sat_qsat_ice_vect
 
@@ -516,13 +535,18 @@ subroutine GoffGratch_svp_water_vect(t, es, vlen)
   integer :: i
   ! uncertain below -70 C
 
+!!  !$acc declare present_or_copyin(tboil)
+
+!!  !$acc parallel vector_length(VLEN)
+!!  !$acc loop gang vector
   do i=1,vlen
      es(i) = 10._r8**(-7.90298_r8*(tboil/t(i)-1._r8)+ &
        5.02808_r8*log10(tboil/t(i))- &
        1.3816e-7_r8*(10._r8**(11.344_r8*(1._r8-t(i)/tboil))-1._r8)+ &
        8.1328e-3_r8*(10._r8**(-3.49149_r8*(tboil/t(i)-1._r8))-1._r8)+ &
        log10(1013.246_r8))*100._r8
-  enddo
+  end do
+!!  !$acc end parallel
 
 end subroutine GoffGratch_svp_water_vect
 
@@ -544,11 +568,17 @@ subroutine GoffGratch_svp_ice_vect(t, es, vlen)
   integer :: i
   ! good down to -100 C
 
+!!  !$acc declare present_or_copyin(h2otrip)
+
+!!  !$acc parallel vector_length(VLEN)
+!!  !$acc loop gang vector
   do i=1,vlen
      es(i) = 10._r8**(-9.09718_r8*(h2otrip/t(i)-1._r8)-3.56654_r8* &
           log10(h2otrip/t(i))+0.876793_r8*(1._r8-t(i)/h2otrip)+ &
           log10(6.1071_r8))*100._r8
-  enddo
+  end do
+!!  !$acc end parallel
+
 end subroutine GoffGratch_svp_ice_vect
 
 ! Murphy & Koop (2005)
@@ -573,12 +603,16 @@ subroutine MurphyKoop_svp_water_vect(t, es, vlen)
   integer :: i
   ! (good for 123 < T < 332 K)
 
+!!  !$acc parallel vector_length(VLEN)
+!!  !$acc loop gang vector
   do i = 1, vlen
      es(i) = exp(54.842763_r8 - (6763.22_r8 / t(i)) - (4.210_r8 * log(t(i))) + &
           (0.000367_r8 * t(i)) + (tanh(0.0415_r8 * (t(i) - 218.8_r8)) * &
           (53.878_r8 - (1331.22_r8 / t(i)) - (9.44523_r8 * log(t(i))) + &
           0.014025_r8 * t(i))))
   end do
+!!  !$acc end parallel
+
 end subroutine MurphyKoop_svp_water_vect
 
 elemental function MurphyKoop_svp_ice(t) result(es)
@@ -599,10 +633,14 @@ subroutine MurphyKoop_svp_ice_vect(t, es, vlen)
   integer :: i
   ! (good down to 110 K)
 
+!!  !$acc parallel vector_length(VLEN)
+!!  !$acc loop gang vector
   do i = 1, vlen
      es(i) = exp(9.550426_r8 - (5723.265_r8 / t(i)) + (3.53068_r8 * log(t(i))) &
              - (0.00728332_r8 * t(i)))
   end do
+!!  !$acc end parallel
+
 end subroutine MurphyKoop_svp_ice_vect
 
 ! Old CAM implementation, also labelled Goff & Gratch (1946)
@@ -646,6 +684,10 @@ subroutine OldGoffGratch_svp_water_vect(t,es,vlen)
   real(r8), dimension(vlen) :: ps, e1, e2, f1, f2, f3, f4, f5, f
   integer :: i
 
+!!  !$acc declare present_or_copyin(tboil)
+
+!!  !$acc parallel vector_length(VLEN)
+!!  !$acc loop gang vector
   do i = 1, vlen
      ps(i) = 1013.246_r8
      e1(i) = 11.344_r8*(1.0_r8 - t(i)/tboil)
@@ -658,6 +700,8 @@ subroutine OldGoffGratch_svp_water_vect(t,es,vlen)
       f(i) = f1(i) + f2(i) + f3(i) + f4(i) + f5(i)
      es(i) = (10.0_r8**f(i))*100.0_r8
   end do
+!!  !$acc end parallel
+
 end subroutine OldGoffGratch_svp_water_vect
 
 elemental function OldGoffGratch_svp_ice(t) result(es)
@@ -681,12 +725,18 @@ subroutine OldGoffGratch_svp_ice_vect(t,es,vlen)
   real(r8), dimension(vlen) :: term1, term2, term3
   integer :: i
 
+!!  !$acc declare present_or_copyin(tmelt)
+
+!!  !$acc parallel vector_length(VLEN)
+!!  !$acc loop gang vector
   do i = 1, vlen
      term1(i) = 2.01889049_r8/(tmelt/t(i))
      term2(i) = 3.56654_r8*log(tmelt/t(i))
      term3(i) = 20.947031_r8*(tmelt/t(i))
      es(i) = 575.185606e10_r8*exp(-(term1(i) + term2(i) + term3(i)))
   end do
+!!  !$acc end parallel
+
 end subroutine OldGoffGratch_svp_ice_vect
 
 ! Bolton (1980)
@@ -721,9 +771,15 @@ subroutine Bolton_svp_water_vect(t, es,vlen)
 
   integer :: i
 
+!!  !$acc declare present_or_copyin(tmelt,c1,c2,c3)
+
+!!  !$acc parallel vector_length(VLEN)
+!!  !$acc loop gang vector
   do i = 1, vlen
      es(i) = c1*exp( (c2*(t(i) - tmelt))/((t(i) - tmelt)+c3) )
   end do
+!!  !$acc end parallel
+
 end subroutine Bolton_svp_water_vect
 
 end module wv_sat_methods
