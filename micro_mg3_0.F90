@@ -939,8 +939,12 @@ subroutine micro_mg_tend ( &
 
   !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
-  !$acc declare copyin(r,rhosu,do_hail,do_graupel,g,microp_uniform) &
-  !$acc         copyin(gamma_br_plus1,gamma_br_plus4,gamma_bs_plus1,gamma_bs_plus4)
+  !$acc declare present_or_copyin(r,rhosu,do_hail,do_graupel,g,microp_uniform) &
+  !$acc         present_or_copyin(gamma_br_plus1,gamma_br_plus4,gamma_bs_plus1,gamma_bs_plus4) &
+  !$acc         present_or_copyin(xxlv,xxls,xxls_squared,rv,cpp,dcs,do_cldice) &
+  !$acc         present_or_copyin(ngcons,nicons,nccons,snowmelt,xlf,rainfrze,tmelt) &
+  !$acc         present_or_copyin(allow_sed_supersat,xxlv_squared)
+
 !!  !$acc data copyin(ar,as,ag,ah,aj,rhow,omsm) &
 !!  !$acc      copyin(p,t) &
 !!  !$acc      copyout(rho,dv,mu,sc,rhof,arn,asn,agn,acn,ain,ajn)
@@ -1030,8 +1034,8 @@ subroutine micro_mg_tend ( &
 !!  !$acc      copyout(rho,dv,mu,sc,rhof,arn,asn,agn,acn,ain,ajn)
 !!
 
-  !$acc parallel vector_length(VLEN)
-  !$acc loop gang vector collapse(2)
+!!  !$acc parallel vector_length(VLEN)
+!!  !$acc loop gang vector collapse(2)
   do k=1,nlev
     do i=1,mgncol
        rho(i,k) = p(i,k)/(r*t(i,k))
@@ -1060,8 +1064,7 @@ subroutine micro_mg_tend ( &
        ajn(i,k)=aj*(rhosu/rho(i,k))**0.35_r8
     end do
   end do
-  !$acc compare(rho(1:mgncol,1:nlev),dv(1:mgncol,1:nlev))
-  !$acc end parallel
+!!  !$acc end parallel
 
 !!  !$acc end data
 
@@ -1979,9 +1982,8 @@ subroutine micro_mg_tend ( &
                                      qric, qsic, lamr, n0r, lams, n0s, pre, prds, am_evp_st, mgncol*nlev)
   end if ! end do_graupel/hail loop
 
-!!  !$acc data present_or_copyin(deltat, omsm, rdeltat, qsmall)
-!!  !$acc parallel vector_length(VLEN) firstprivate(dum,ratio)
-!!  !$acc loop gang vector collapse(2)
+  !$acc parallel vector_length(VLEN)
+  !$acc loop gang vector collapse(2) private(dum,ratio)
   do k=1,nlev
      do i=1,mgncol
         ! conservation to ensure no negative values of cloud water/precipitation
@@ -2023,11 +2025,10 @@ subroutine micro_mg_tend ( &
         end if
      end do
   end do
-!!  !$acc end parallel
-!!  !$acc end data
+  !$acc end parallel
 
-!!  !$acc parallel vector_length(VLEN)
-!!  !$acc loop gang vector collapse(2) private(dum,dum1)
+  !$acc parallel vector_length(VLEN)
+  !$acc loop gang vector collapse(2) private(dum,dum1)
   do k=1,nlev
      do i=1,mgncol
         !=================================================================
@@ -2055,8 +2056,10 @@ subroutine micro_mg_tend ( &
         end if
      end do
   end do 
+  !$acc end parallel
 
-!!  !$acc loop gang vector collapse(2) private(dum,ratio)
+  !$acc parallel vector_length(VLEN)
+  !$acc loop gang vector collapse(2) private(dum,ratio)
   do k=1,nlev
      do i=1,mgncol
         !===================================================================
@@ -2088,10 +2091,10 @@ subroutine micro_mg_tend ( &
         end if
      end do
   end do
-!!  !$acc end parallel
+  !$acc end parallel
 
-!!  !$acc parallel vector_length(VLEN)
-!!  !$acc loop gang vector collapse(2) private(dum,ratio)
+!!  !$acc parallel vector_length(VLEN) private(dum,ratio)
+!!  !$acc loop gang vector collapse(2)
   do k=1,nlev
      do i=1,mgncol
         ! conservation of rain mixing ratio
@@ -2117,7 +2120,7 @@ subroutine micro_mg_tend ( &
   end do
 !!  !$acc end parallel
 
-  !$acc parallel vector_length(VLEN) 
+  !$acc parallel vector_length(VLEN)
   !$acc loop gang vector collapse(2)
   do k=1,nlev
      do i=1,mgncol
@@ -2133,8 +2136,8 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-!!  !$acc parallel vector_length(VLEN) 
-!!  !$acc loop gang vector collapse(2) private(dum,ratio)
+!!  !$acc parallel vector_length(VLEN) private(dum,ratio)
+!!  !$acc loop gang vector collapse(2) 
   do k=1,nlev
      do i=1,mgncol
         dum = ((-nsubr(i,k)+npracs(i,k)+nnuccr(i,k)+nnuccri(i,k)-nragg(i,k)+npracg(i,k)+ngracs(i,k)) &
@@ -2152,9 +2155,11 @@ subroutine micro_mg_tend ( &
         end if
      end do
   end do
+!!  !$acc end parallel
 
   if (do_cldice) then
-!!     !$acc loop gang vector collapse(2) private(dum,ratio)
+!!     !$acc parallel vector_length(VLEN) 
+!!     !$acc loop gang vector collapse(2)
      do k=1,nlev
         do i=1,mgncol
            ! conservation of qi
@@ -2173,7 +2178,9 @@ subroutine micro_mg_tend ( &
            end if
         end do
      end do
+!!     !$acc end parallel
   end if
+!!  !$acc end parallel
 
   if (do_cldice) then
 !!     !$acc loop gang vector collapse(2) private(dum,ratio,tmpfrz)
@@ -2201,10 +2208,9 @@ subroutine micro_mg_tend ( &
         end do
      end do
   end if
-!!  !$acc end parallel
 
-!!  !$acc parallel vector_length(VLEN) private(dum,ratio)
-!!  !$acc loop gang vector collapse(2)
+  !$acc parallel vector_length(VLEN) private(dum,ratio)
+  !$acc loop gang vector collapse(2)
   do k=1,nlev
      do i=1,mgncol
         ! conservation of snow mixing ratio
@@ -2235,9 +2241,10 @@ subroutine micro_mg_tend ( &
         end if
      end do
   end do
-!!  !$acc end parallel
+  !$acc end parallel
 
-  !!!$acc loop gang vector collapse(2) private(dum,ratio)
+  !$acc parallel vector_length(VLEN) private(dum,ratio)
+  !$acc loop gang vector collapse(2)
   do k=1,nlev
      do i=1,mgncol
         ! conservation of snow number
@@ -2266,6 +2273,7 @@ subroutine micro_mg_tend ( &
         end if
      end do
   end do
+  !$acc end parallel
 
 ! Graupel Conservation Checks
 !-------------------------------------------------------------------
@@ -2273,8 +2281,8 @@ subroutine micro_mg_tend ( &
   if (do_hail.or.do_graupel) then
      ! conservation of graupel mass
      !-------------------------------------------------------------------
-
-     !!!$acc loop gang vector collapse(2) private(dum,ratio)
+!!     !$acc parallel vector_length(VLEN) private(dum,ratio)
+!!     !$acc loop gang vector collapse(2)
      do k=1,nlev
         do i=1,mgncol
            dum= ((-pracg(i,k)-pgracs(i,k)-prdg(i,k)-psacr(i,k)-mnuccr(i,k))*precip_frac(i,k) &
@@ -2287,12 +2295,14 @@ subroutine micro_mg_tend ( &
            end if
         end do
      end do
-        ! conservation of graupel number: not needed, no sinks
-        !-------------------------------------------------------------------
+!!     !$acc end parallel
+
+     ! conservation of graupel number: not needed, no sinks
+     !-------------------------------------------------------------------
   end if
 
-!!  !$acc parallel vector_length(VLEN)
-!!  !$acc loop gang vector collapse(2)
+  !$acc parallel vector_length(VLEN)
+  !$acc loop gang vector collapse(2)
   do k=1,nlev
      do i=1,mgncol
         ! next limit ice and snow sublimation and rain evaporation
@@ -2305,7 +2315,7 @@ subroutine micro_mg_tend ( &
              ((prds(i,k)+prdg(i,k))*precip_frac(i,k)+vap_dep(i,k)+ice_sublim(i,k)+mnuccd(i,k))*xxls)*deltat/cpp
      end do
   end do
-!!  !$acc end parallel
+  !$acc end parallel
 
   ! use rhw to allow ice supersaturation
   call qsat_water(ttmpA, p, esnA, qvnAI, mgncol*nlev)
@@ -2944,8 +2954,8 @@ subroutine micro_mg_tend ( &
   !====================================================================
   ! melting of snow at +2 C
 
-  !!!$acc parallel vector_length(VLEN)
-  !!!$acc loop gang vector collapse(2) private(dum,dum1)
+!!  !$acc parallel vector_length(VLEN) private(dum,dum1)
+!!  !$acc loop gang vector collapse(2)
   do k=1,nlev
      do i=1,mgncol
         if (t(i,k)+tlat(i,k)/cpp*deltat > snowmelt) then
@@ -2973,10 +2983,11 @@ subroutine micro_mg_tend ( &
         end if
      end do
   end do
+!!  !$acc end parallel
 
   ! melting of graupel at +2 C
 
-  !!!$acc loop gang vector collapse(2) private(dum,dum1) 
+!!  !$acc loop gang vector collapse(2) private(dum,dum1) 
   do k=1,nlev
      do i=1,mgncol
         if (t(i,k)+tlat(i,k)/cpp*deltat > snowmelt) then
@@ -3005,15 +3016,15 @@ subroutine micro_mg_tend ( &
         end if
      end do
   end do
-  !!!$acc end parallel
+!!  !$acc end parallel
 
   ! get mean size of rain = 1/lamr, add frozen rain to either snow or cloud ice
   ! depending on mean rain size
   ! add to graupel if using that option....
   call size_dist_param_basic_vect(mg_rain_props, dumr, dumnr, lamr, mgncol*nlev)
 
-  !!!$acc parallel vector_length(VLEN)
-  !!!$acc loop gang vector collapse(2) private(dum,dum1)
+  !$acc parallel vector_length(VLEN)
+  !$acc loop gang vector collapse(2) private(dum,dum1)
   do k=1,nlev
      do i=1,mgncol
 
@@ -3061,11 +3072,11 @@ subroutine micro_mg_tend ( &
 
      end do
   end do
-  !!!$acc end parallel
+  !$acc end parallel
 
   if (do_cldice) then
-     !!!$acc parallel vector_length(VLEN)
-     !!!$acc loop gang vector collapse(2) private(dum)
+!!     !$acc parallel vector_length(VLEN) private(dum)
+!!     !$acc loop gang vector collapse(2)
      do k=1,nlev
         do i=1,mgncol
            if (t(i,k)+tlat(i,k)/cpp*deltat > tmelt) then
@@ -3101,11 +3112,13 @@ subroutine micro_mg_tend ( &
            end if
         end do
      end do
+!!     !$acc end parallel
 
      ! homogeneously freeze droplets at -40 C
      !-----------------------------------------------------------------
 
-     !!!$acc loop gang vector collapse(2) private(dum)
+!!     !$acc parallel vector_length(VLEN) 
+!!     !$acc loop gang vector collapse(2) private(dum)
      do k=1,nlev
         do i=1,mgncol
            if (t(i,k)+tlat(i,k)/cpp*deltat < 233.15_r8) then
@@ -3136,26 +3149,28 @@ subroutine micro_mg_tend ( &
            end if
         end do 
      end do 
+!!     !$acc end parallel
 
      ! remove any excess over-saturation, which is possible due to non-linearity when adding
      ! together all microphysical processes
      !-----------------------------------------------------------------
      ! follow code similar to old CAM scheme
 
-     !!!$acc loop gang vector collapse(2)
+     !$acc parallel vector_length(VLEN)
+     !$acc loop gang vector collapse(2)
      do k=1,nlev
         do i=1,mgncol
            dum_2D(i,k)=q(i,k)+qvlat(i,k)*deltat
            ttmpA(i,k)=t(i,k)+tlat(i,k)/cpp*deltat
         end do
      end do
-     !!!$acc end parallel
+     !$acc end parallel
 
      ! use rhw to allow ice supersaturation
      call qsat_water(ttmpA, p, esnA, qvnA, mgncol*nlev)
 
-     !!!$acc parallel vector_length(VLEN)
-     !!!$acc loop gang vector collapse(2) private(dum,dum1)
+!!     !$acc parallel vector_length(VLEN) private(dum,dum1)
+!!     !$acc loop gang vector collapse(2)
      do k=1,nlev
         do i=1,mgncol
            if (dum_2D(i,k) > qvnA(i,k) .and. qvnA(i,k) > 0 .and. allow_sed_supersat) then
@@ -3188,7 +3203,7 @@ subroutine micro_mg_tend ( &
            end if
         end do 
      end do 
-     !!!$acc end parallel
+!!     !$acc end parallel
   end if
 
   ! calculate effective radius for pass to radiation code
@@ -3199,8 +3214,8 @@ subroutine micro_mg_tend ( &
   ! update cloud variables after instantaneous processes to get effective radius
   ! variables are in-cloud to calculate size dist parameters
 
-  !!!$acc parallel vector_length(VLEN)
-  !!!$acc loop gang vector collapse(2)
+  !$acc parallel vector_length(VLEN)
+  !$acc loop gang vector collapse(2)
   do k=1,nlev
      do i=1,mgncol
         dumc(i,k) = max(qc(i,k)+qctend(i,k)*deltat,0._r8)/lcldm(i,k)
@@ -3239,25 +3254,25 @@ subroutine micro_mg_tend ( &
         dumg(i,k)=min(dumg(i,k),10.e-3_r8)
      end do
   end do
-  !!!$acc end parallel
+  !$acc end parallel
 
   ! cloud ice effective radius
   !-----------------------------------------------------------------
 
   if (do_cldice) then
-     !!!$acc parallel vector_length(VLEN)
-     !!!$acc loop gang vector collapse(2)
+     !$acc parallel vector_length(VLEN)
+     !$acc loop gang vector collapse(2)
      do k=1,nlev
         do i=1,mgncol
            dum_2D(i,k) = dumni(i,k)
         end do
      end do
-     !!!$acc end parallel
+     !$acc end parallel
 
      call size_dist_param_basic_vect(mg_ice_props, dumi, dumni, lami, mgncol*nlev, n0=dumni0A2D)
 
-     !!!$acc parallel vector_length(VLEN)
-     !!!$acc loop gang vector collapse(2)
+     !$acc parallel vector_length(VLEN)
+     !$acc loop gang vector collapse(2)
      do k=1,nlev
         do i=1,mgncol
            if (dumi(i,k).ge.qsmall) then
@@ -3276,10 +3291,10 @@ subroutine micro_mg_tend ( &
            deffi(i,k)=effi(i,k)*rhoi/rhows*2._r8
         end do
      end do
-     !!!$acc end parallel
+     !$acc end parallel
   else
-     !!!$acc parallel vector_length(VLEN)
-     !!!acc loop gang vector collapse(2)
+     !$acc parallel vector_length(VLEN)
+     !acc loop gang vector collapse(2)
      do k=1,nlev
         do i=1,mgncol
            ! NOTE: If CARMA is doing the ice microphysics, then the ice effective
@@ -3289,7 +3304,7 @@ subroutine micro_mg_tend ( &
            sadice(i,k) = 4._r8*pi*(effi(i,k)**2)*ni(i,k)*rho(i,k)*1e-2_r8
         end do
      end do
-     !!!$acc end parallel
+     !$acc end parallel
   end if
 
   ! cloud droplet effective radius
