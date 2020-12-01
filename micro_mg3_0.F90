@@ -2211,8 +2211,8 @@ subroutine micro_mg_tend ( &
      !$acc end parallel
   end if
 
-  !$acc parallel vector_length(VLEN) private(dum,ratio)
-  !$acc loop gang vector collapse(2)
+  !$acc parallel vector_length(VLEN)
+  !$acc loop gang vector collapse(2) private(dum,ratio)
   do k=1,nlev
      do i=1,mgncol
         ! conservation of snow mixing ratio
@@ -2245,8 +2245,8 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  !$acc parallel vector_length(VLEN) private(dum,ratio)
-  !$acc loop gang vector collapse(2)
+  !$acc parallel vector_length(VLEN)
+  !$acc loop gang vector collapse(2) private(dum,ratio)
   do k=1,nlev
      do i=1,mgncol
         ! conservation of snow number
@@ -3172,8 +3172,8 @@ subroutine micro_mg_tend ( &
      ! use rhw to allow ice supersaturation
      call qsat_water(ttmpA, p, esnA, qvnA, mgncol*nlev)
 
-!!     !$acc parallel vector_length(VLEN) private(dum,dum1)
-!!     !$acc loop gang vector collapse(2)
+!!     !$acc parallel vector_length(VLEN)
+!!     !$acc loop gang vector collapse(2) private(dum,dum1)
      do k=1,nlev
         do i=1,mgncol
            if (dum_2D(i,k) > qvnA(i,k) .and. qvnA(i,k) > 0 .and. allow_sed_supersat) then
