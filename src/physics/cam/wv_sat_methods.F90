@@ -55,7 +55,7 @@ integer, parameter :: Bolton_idx = 3
 integer, parameter :: initial_default_idx = GoffGratch_idx
 integer :: default_idx = initial_default_idx
 
-!!!!$acc declare copyin(epsilo, tmelt, tboil, default_idx, omeps, h2otrip)
+!$acc declare copyin(epsilo, tmelt, tboil, default_idx, omeps, h2otrip)
 
 public wv_sat_methods_init
 public wv_sat_get_scheme_idx
@@ -535,10 +535,9 @@ subroutine GoffGratch_svp_water_vect(t, es, vlen)
   integer :: i
   ! uncertain below -70 C
 
-!!  !$acc declare present_or_copyin(tboil)
 
-!!  !$acc parallel vector_length(VLEN)
-!!  !$acc loop gang vector
+  !$acc parallel vector_length(VLEN)
+  !$acc loop gang vector
   do i=1,vlen
      es(i) = 10._r8**(-7.90298_r8*(tboil/t(i)-1._r8)+ &
        5.02808_r8*log10(tboil/t(i))- &
@@ -546,7 +545,7 @@ subroutine GoffGratch_svp_water_vect(t, es, vlen)
        8.1328e-3_r8*(10._r8**(-3.49149_r8*(tboil/t(i)-1._r8))-1._r8)+ &
        log10(1013.246_r8))*100._r8
   end do
-!!  !$acc end parallel
+  !$acc end parallel
 
 end subroutine GoffGratch_svp_water_vect
 
@@ -568,16 +567,15 @@ subroutine GoffGratch_svp_ice_vect(t, es, vlen)
   integer :: i
   ! good down to -100 C
 
-!!  !$acc declare present_or_copyin(h2otrip)
 
-!!  !$acc parallel vector_length(VLEN)
-!!  !$acc loop gang vector
+  !$acc parallel vector_length(VLEN)
+  !$acc loop gang vector
   do i=1,vlen
      es(i) = 10._r8**(-9.09718_r8*(h2otrip/t(i)-1._r8)-3.56654_r8* &
           log10(h2otrip/t(i))+0.876793_r8*(1._r8-t(i)/h2otrip)+ &
           log10(6.1071_r8))*100._r8
   end do
-!!  !$acc end parallel
+  !$acc end parallel
 
 end subroutine GoffGratch_svp_ice_vect
 
@@ -603,15 +601,15 @@ subroutine MurphyKoop_svp_water_vect(t, es, vlen)
   integer :: i
   ! (good for 123 < T < 332 K)
 
-!!  !$acc parallel vector_length(VLEN)
-!!  !$acc loop gang vector
+  !$acc parallel vector_length(VLEN)
+  !$acc loop gang vector
   do i = 1, vlen
      es(i) = exp(54.842763_r8 - (6763.22_r8 / t(i)) - (4.210_r8 * log(t(i))) + &
           (0.000367_r8 * t(i)) + (tanh(0.0415_r8 * (t(i) - 218.8_r8)) * &
           (53.878_r8 - (1331.22_r8 / t(i)) - (9.44523_r8 * log(t(i))) + &
           0.014025_r8 * t(i))))
   end do
-!!  !$acc end parallel
+  !$acc end parallel
 
 end subroutine MurphyKoop_svp_water_vect
 
@@ -633,13 +631,13 @@ subroutine MurphyKoop_svp_ice_vect(t, es, vlen)
   integer :: i
   ! (good down to 110 K)
 
-!!  !$acc parallel vector_length(VLEN)
-!!  !$acc loop gang vector
+  !$acc parallel vector_length(VLEN)
+  !$acc loop gang vector
   do i = 1, vlen
      es(i) = exp(9.550426_r8 - (5723.265_r8 / t(i)) + (3.53068_r8 * log(t(i))) &
              - (0.00728332_r8 * t(i)))
   end do
-!!  !$acc end parallel
+  !$acc end parallel
 
 end subroutine MurphyKoop_svp_ice_vect
 
@@ -684,10 +682,9 @@ subroutine OldGoffGratch_svp_water_vect(t,es,vlen)
   real(r8), dimension(vlen) :: ps, e1, e2, f1, f2, f3, f4, f5, f
   integer :: i
 
-!!  !$acc declare present_or_copyin(tboil)
 
-!!  !$acc parallel vector_length(VLEN)
-!!  !$acc loop gang vector
+  !$acc parallel vector_length(VLEN)
+  !$acc loop gang vector
   do i = 1, vlen
      ps(i) = 1013.246_r8
      e1(i) = 11.344_r8*(1.0_r8 - t(i)/tboil)
@@ -700,7 +697,7 @@ subroutine OldGoffGratch_svp_water_vect(t,es,vlen)
       f(i) = f1(i) + f2(i) + f3(i) + f4(i) + f5(i)
      es(i) = (10.0_r8**f(i))*100.0_r8
   end do
-!!  !$acc end parallel
+  !$acc end parallel
 
 end subroutine OldGoffGratch_svp_water_vect
 
@@ -725,17 +722,15 @@ subroutine OldGoffGratch_svp_ice_vect(t,es,vlen)
   real(r8), dimension(vlen) :: term1, term2, term3
   integer :: i
 
-!!  !$acc declare present_or_copyin(tmelt)
-
-!!  !$acc parallel vector_length(VLEN)
-!!  !$acc loop gang vector
+  !$acc parallel vector_length(VLEN)
+  !$acc loop gang vector
   do i = 1, vlen
      term1(i) = 2.01889049_r8/(tmelt/t(i))
      term2(i) = 3.56654_r8*log(tmelt/t(i))
      term3(i) = 20.947031_r8*(tmelt/t(i))
      es(i) = 575.185606e10_r8*exp(-(term1(i) + term2(i) + term3(i)))
   end do
-!!  !$acc end parallel
+  !$acc end parallel
 
 end subroutine OldGoffGratch_svp_ice_vect
 
@@ -771,14 +766,12 @@ subroutine Bolton_svp_water_vect(t, es,vlen)
 
   integer :: i
 
-!!  !$acc declare present_or_copyin(tmelt,c1,c2,c3)
-
-!!  !$acc parallel vector_length(VLEN)
-!!  !$acc loop gang vector
+  !$acc parallel vector_length(VLEN)
+  !$acc loop gang vector
   do i = 1, vlen
      es(i) = c1*exp( (c2*(t(i) - tmelt))/((t(i) - tmelt)+c3) )
   end do
-!!  !$acc end parallel
+  !$acc end parallel
 
 end subroutine Bolton_svp_water_vect
 
