@@ -253,8 +253,8 @@ real(r8) :: gamma_half_br_plus5
 real(r8) :: gamma_half_bs_plus5
 real(r8) :: gamma_2bs_plus2
 
-!$acc declare present_or_copyin(rv,cpp,mmult) &
-!$acc         present_or_copyin(pi,qsmall,rhosn,rhoi,rhow,rhog,bs,br,bg,mi0,mg0) &
+!$acc declare create(rv,cpp) &
+!$acc         present_or_copyin(mmult,pi,qsmall,rhosn,rhoi,rhow,rhog,bs,br,bg,mi0,mg0) &
 !$acc         present_or_copyin(limiter_off,icsmall,f1s,f2s,f1r,f2r,eii,ecid,ecr) &
 !$acc         present_or_copyin(aimm,bimm,droplet_mass_25um,droplet_mass_40um,tmelt,xxlv,xxls) &
 !$acc         present_or_copyin(gamma_bs_plus3,gamma_half_br_plus5,gamma_half_bs_plus5,gamma_2bs_plus2)
@@ -389,7 +389,7 @@ end function NewMGHydrometeorProps
 
 ! Use gamma function to implement rising factorial extended to the reals.
 subroutine rising_factorial_r8(x, n, res)
-  !!!$acc routine seq
+  !$acc routine seq
   real(r8), intent(in) :: x, n
   real(r8), intent(out) :: res
 
@@ -406,15 +406,15 @@ subroutine rising_factorial_r8_vec(x, n, res,vlen)
   real(r8) :: tmp(vlen)
 
 #if defined(__OPENACC__)
-  !!!$acc parallel vector_length(VLEN)
-  !!!$acc loop gang vector
+  !$acc parallel vector_length(VLEN)
+  !$acc loop gang vector
   do i=1,vlen
      tmp(i) = x(i)+n
      res(i) = gamma(tmp(i))
      tmp(i) = gamma(x(i))
      res(i) = res(i)/tmp(i)
   end do
-  !!!$acc end parallel
+  !$acc end parallel
 #else
   tmp = x+n
   res = gamma(tmp)
@@ -503,7 +503,8 @@ subroutine calc_ab_line(t, qv, xxl, ab)
   real(r8), intent(out) :: ab
 
   real(r8) :: dqsdt
-
+ 
+  !$acc update device(rv,cpp)
   dqsdt = xxl*qv / (rv * t**2)
   ab = 1._r8 + dqsdt*xxl/cpp
 
@@ -521,6 +522,7 @@ subroutine calc_ab_vect(t, qv, xxl, ab, vlen)
   real(r8) :: dqsdt(vlen)
   integer :: i
 
+  !$acc update device(rv,cpp)
   !$acc parallel vector_length(VLEN)
   !$acc loop gang vector
   do i=1,vlen
@@ -847,7 +849,7 @@ subroutine avg_diameter_vec (q, n, rho_air, rho_sub, avg_diameter, vlen)
 end subroutine avg_diameter_vec
 
 subroutine var_coef_r8(relvar, a, res)
-!!  !$acc routine seq
+  !$acc routine seq
 
   ! Finds a coefficient for process rates based on the relative variance
   ! of cloud water.
@@ -1368,8 +1370,8 @@ subroutine contact_freezing (microp_uniform, t, p, rndst, nacon, &
 
   integer  :: i, j
 
-!!  !$acc parallel vector_length(VLEN)
-!!  !$acc loop gang vector private(dum,dum1,tcnt,viscosity,mfp,contact_factor,tmp)
+  !$acc parallel vector_length(VLEN)
+  !$acc loop gang vector private(dum,dum1,tcnt,viscosity,mfp,contact_factor,tmp)
   do i = 1, vlen
 
         if (qcic(i) >= qsmall .and. t(i) < 269.15_r8) then
@@ -1411,7 +1413,7 @@ subroutine contact_freezing (microp_uniform, t, p, rndst, nacon, &
         end if ! qcic > qsmall and t < -4 deg C
 
   end do
-!!  !$acc end parallel
+  !$acc end parallel
 
 end subroutine contact_freezing
 
