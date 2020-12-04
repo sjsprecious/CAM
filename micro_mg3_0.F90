@@ -1764,8 +1764,8 @@ subroutine micro_mg_tend ( &
      call size_dist_param_basic_vect(mg_graupel_props, qgic, ngic, lamg, mgncol*nlev, n0=n0g)
   end if
         
-  !$acc parallel vector_length(VLEN)
-  !$acc loop gang vector collapse(2)
+!!  !$acc parallel vector_length(VLEN)
+!!  !$acc loop gang vector collapse(2)
   do k=1,nlev
      do i=1,mgncol
         if (lamg(i,k) > 0._r8) then
@@ -1779,7 +1779,7 @@ subroutine micro_mg_tend ( &
         end if
      end do
   end do
-  !$acc end parallel
+!!  !$acc end parallel
 
   if (do_cldice) then
      if (.not. use_hetfrz_classnuc) then
@@ -2718,8 +2718,8 @@ subroutine micro_mg_tend ( &
   call size_dist_param_basic_vect(mg_ice_props, dumi, dumni, lami, mgncol*nlev)
   call size_dist_param_liq_vect(mg_liq_props, dumc, dumnc, rho, pgam, lamc, mgncol*nlev)
 
-  !$acc parallel vector_length(VLEN)
-  !$acc loop gang vector collapse(2) private(dum1,dum2,dum3,dum4)
+!!  !$acc parallel vector_length(VLEN)
+!!  !$acc loop gang vector collapse(2) private(dum1,dum2,dum3,dum4)
   do k=1,nlev
      do i=1,mgncol
 
@@ -2745,7 +2745,7 @@ subroutine micro_mg_tend ( &
 
      end do
   end do
-  !$acc end parallel
+!!  !$acc end parallel
 
   !$acc parallel vector_length(VLEN)
   !$acc loop gang vector collapse(2) private(irad,ifrac)
@@ -2800,8 +2800,8 @@ subroutine micro_mg_tend ( &
      call size_dist_param_basic_vect(mg_graupel_props, dumg, dumng, lamg, mgncol*nlev)
   end if
 
-  !$acc parallel vector_length(VLEN)
-  !$acc loop gang vector collapse(2)
+!!  !$acc parallel vector_length(VLEN)
+!!  !$acc loop gang vector collapse(2)
   do k=1,nlev
      do i=1,mgncol
         if (lamr(i,k).ge.qsmall) then
@@ -2845,7 +2845,7 @@ subroutine micro_mg_tend ( &
         pdel_inv(i,k) = 1._r8/pdel(i,k)
      end do
   end do
-  !$acc end parallel
+!!  !$acc end parallel
 
   !$acc parallel vector_length(VLEN)
   !$acc loop gang vector collapse(2)
