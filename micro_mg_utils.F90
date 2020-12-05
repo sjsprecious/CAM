@@ -533,7 +533,7 @@ end subroutine calc_ab_vect
 
 ! get cloud droplet size distribution parameters
 subroutine size_dist_param_liq_line(props, qcic, ncic, rho, pgam, lamc)
-  !!!$acc routine seq
+  !$acc routine seq
 
   type(MGHydrometeorProps), intent(in)    :: props
   real(r8),                 intent(in)    :: qcic
@@ -2013,8 +2013,8 @@ subroutine evaporate_sublimate_precip_graupel(t, rho, dv, mu, sc, q, qvl, qvi, &
   ! this will ensure that evaporation/sublimation of precip occurs over
   ! entire grid cell, since min cloud fraction is specified otherwise
 
-!!  !$acc parallel vector_length(VLEN)
-!!  !$acc loop gang vector
+  !$acc parallel vector_length(VLEN)
+  !$acc loop gang vector
   do i=1,vlen
      am_evp_st(i) = 0._r8
      if (qcic(i)+qiic(i) < 1.e-6_r8) then
@@ -2024,7 +2024,7 @@ subroutine evaporate_sublimate_precip_graupel(t, rho, dv, mu, sc, q, qvl, qvi, &
      end if
   end do
 
-!!  !$acc loop gang vector private(qclr,eps,abr,ab,abg)
+  !$acc loop gang vector private(qclr,eps,abr,ab,abg)
   do i=1,vlen
      ! only calculate if there is some precip fraction > cloud fraction
      if (precip_frac(i) > dum(i)) then
@@ -2096,7 +2096,7 @@ subroutine evaporate_sublimate_precip_graupel(t, rho, dv, mu, sc, q, qvl, qvi, &
 
      end if
   end do
-!!  !$acc end parallel
+  !$acc end parallel
 
 end subroutine evaporate_sublimate_precip_graupel
 
