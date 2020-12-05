@@ -127,7 +127,7 @@ module shr_spfn_mod
   ! for IEEE double-precision.
   real(r8), parameter :: xbig_gamma = 171.624_r8
 
-  !$acc declare present_or_copyin(xinfr8,epsr8,xminr8,xbig_gamma)
+  !$acc declare copyin(xinfr8,epsr8,xminr8,xbig_gamma)
 
 contains
 
