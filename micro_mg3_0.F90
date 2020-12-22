@@ -886,16 +886,6 @@ subroutine micro_mg_tend ( &
   real(r8) :: fs(mgncol,nlev)
   real(r8) :: fns(mgncol,nlev)
 
-  real(r8) :: faloutc(nlev)
-  real(r8) :: faloutnc(nlev)
-  real(r8) :: falouti(nlev)
-  real(r8) :: faloutni(nlev)
-
-  real(r8) :: faloutr(nlev)
-  real(r8) :: faloutnr(nlev)
-  real(r8) :: falouts(nlev)
-  real(r8) :: faloutns(nlev)
-
   real(r8) :: rainrt(mgncol,nlev)     ! rain rate for reflectivity calculation
 
   ! dummy variables
@@ -939,15 +929,14 @@ subroutine micro_mg_tend ( &
 
   !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
-  !$acc declare present_or_copyin(r,rhosu,do_hail,do_graupel,g,microp_uniform) &
-  !$acc         present_or_copyin(gamma_br_plus1,gamma_br_plus4,gamma_bs_plus1,gamma_bs_plus4) &
-  !$acc         present_or_copyin(xxlv,xxls,xxls_squared,rv,cpp,dcs,do_cldice) &
-  !$acc         present_or_copyin(ngcons,nicons,nccons,snowmelt,xlf,rainfrze,tmelt) &
-  !$acc         present_or_copyin(allow_sed_supersat,xxlv_squared)
-
-!!  !$acc data copyin(ar,as,ag,ah,aj,rhow,omsm) &
-!!  !$acc      copyin(p,t) &
-!!  !$acc      copyout(rho,dv,mu,sc,rhof,arn,asn,agn,acn,ain,ajn)
+!$acc declare copyin (nccons,nicons,ngcons,ncnst,ninst,ngnst,dcs,g,r,rv,cpp)   &
+!$acc         copyin (xxlv,xlf,microp_uniform,do_cldice,use_hetfrz_classnuc)   &
+!$acc         copyin (do_hail,do_graupel,rhosu,icenuct,snowmelt,rainfrze,xxls) &
+!$acc         copyin (tmelt,gamma_br_plus4,gamma_bs_plus1,gamma_bs_plus4)      &
+!$acc         copyin (gamma_bi_plus4,gamma_bj_plus1,gamma_bj_plus4,rhmini)     &
+!$acc         copyin (xxlv_squared,xxls_squared,micro_mg_berg_eff_factor)      &
+!$acc         copyin (allow_sed_supersat,do_sb_physics,MG_PRECIP_FRAC_INCLOUD) &
+!$acc         copyin (MG_PRECIP_FRAC_OVERLAP,gamma_br_plus1,gamma_bi_plus1)
 
   ! Return error message
   errstring = ' '
@@ -963,6 +952,59 @@ subroutine micro_mg_tend ( &
   else if(trim(micro_mg_precip_frac_method) == 'max_overlap') then
      precip_frac_method = MG_PRECIP_FRAC_OVERLAP
   endif
+
+  !===============================================
+  ! set mtime here to avoid answer-changing
+  mtime=deltat
+
+  bgtmp=0._r8
+  rhogtmp=0._r8
+
+  if (do_hail) then 
+     bgtmp = bh 
+     rhogtmp = rhoh
+  end if
+  if (do_graupel) then 
+     bgtmp = bg
+     rhogtmp = rhog
+  end if
+
+  mdust = size(rndst,3)
+
+!$acc data copyin  (t,q,qcn,qin,ncn,nin,qrn,qsn,nrn,nsn,qgr,ngr,relvar,frzimm) &
+!$acc      copyin  (accre_enhan,p,pdel,cldn,liqcldf,icecldf,qsatfac,frzcnt)    &
+!$acc      copyin  (naai,npccn,rndst,nacon,tnd_qsnow,tnd_nsnow,re_ice,frzdep)  &
+!$acc      copyout (qcsinksum_rate1ord,tlat,qvlat,qctend,qitend,nctend,rercld) &
+!$acc      copyout (nitend,qrtend,qstend,nrtend,nstend,bergstot,bergtot,effc)  &
+!$acc      copyout (effc_fn,effi,sadice,sadsnow,prect,preci,nevapr,evapsnow)   &
+!$acc      copyout (am_evp_st,prain,prodsnow,cmeout,deffi,pgamrad,psacwstot)   &
+!$acc      copyout (qsout,dsout,lflx,iflx,rflx,sflx,gflx,reff_rain,qssedten)   &
+!$acc      copyout (reff_snow,reff_grau,qcsevap,qisevap,qvres,cmeitot,vtrmc)   &
+!$acc      copyout (vtrmi,umr,ums,umg,qgsedten,qcsedten,qisedten,qrsedten)     &
+!$acc      copyout (pratot,prctot,mnuccctot,mnuccttot,msacwitot,freqg,qrout)   &
+!$acc      copyout (qgtend,ngtend,lamcrad,melttot,homotot,qcrestot,prer_evap)  &
+!$acc      copyout (prcitot,praitot,qirestot,mnuccrtot,mnuccritot,pracstot)    &
+!$acc      copyout (meltsdttot,frzrdttot,mnuccdtot,pracgtot,psacwgtot,fcsrfl)  &
+!$acc      copyout (pgsacwtot,pgracstot,prdgtot,qmultgtot,qmultrgtot,psacrtot) &
+!$acc      copyout (npracgtot,nscngtot,ngracstot,nmultgtot,nmultrgtot,nrout)   &
+!$acc      copyout (nsout,refl,arefl,npsacwgtot,areflz,frefl,csrfl,acsrfl)     &
+!$acc      copyout (ncai,ncal,qrout2,qsout2,nrout2,nsout2,drout2,dsout2,freqs) &
+!$acc      copyout (freqr,nfice,qcrat,qgout,dgout,ngout,qgout2,ngout2,dgout2)  &
+!$acc      create  (qc,qi,nc,ni,qr,qs,nr,ns,qg,ng,rho,dv,mu,sc,rhof,pdel_inv)  &
+!$acc      create  (precip_frac,cldm,icldm,lcldm,qsfm,qgic,ngic,qgic,lamg,n0g) &
+!$acc      create  (minstgm,ninstgm,pracg,psacwg,nmultg,nmultrg,npracg,nscng)  &
+!$acc      create  (nsagg,nragg,ngracs,npsacwg,prdg,qmultg,qmultrg,ung,agn)    &
+!$acc      create  (dumg,dumng,dum_2D,dum1A,dum2A,dum3A,dumni0A2D,dumns0A2D)   &
+!$acc      create  (ttmpA,esi,esnA,qvl,qvi,qvnA,pgsacw,pgracs,nnuccd,mnuccd)   &
+!$acc      create  (mnudep,nnudep,nimax,minstsm,ninstsm,minstrf,ninstrf,mi0l)  &
+!$acc      create  (arn,asn,acn,ain,ajn,fc,fnc,fi,fni,fg,fng,fr,fnr,fs,fns)    &
+!$acc      create  (esl,relhum,nsubi,nsubc,nsubs,nsubr,berg,bergs,uns,unr)     &
+!$acc      create  (rainrt,vap_dep,ice_sublim,mnuccc,nnuccc,mnucct,nnucct)     &
+!$acc      create  (mnuccr,nnuccr,mnuccri,nnuccri,uns,unr,msacwi,nsacwi,lami)  &
+!$acc      create  (lamc,n0i,lams,n0s,lamr,n0r,psacws,npsacws,pracs,npracs)    &
+!$acc      create  (pgam,prc,nprc,nprc1,pra,npra,prci,nprci,prai,nprai,pre)    &
+!$acc      create  (prds,psacr,ncic,niic,nsic,nric,qiic,qsic,qric,dumi,dumni)  &
+!$acc      create  (dumr,dumnr,dums,dumns,dumc,dumnc,qcic)
 
   ! Copies of input concentrations that may be changed internally.
   !$acc parallel vector_length(VLEN)
@@ -1094,12 +1136,12 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  !===============================================
-  ! set mtime here to avoid answer-changing
-  mtime=deltat
-
-  bgtmp=0._r8
-  rhogtmp=0._r8
+!  !===============================================
+!  ! set mtime here to avoid answer-changing
+!  mtime=deltat
+!
+!  bgtmp=0._r8
+!  rhogtmp=0._r8
 
   ! initialize microphysics output
   !$acc parallel vector_length(VLEN)
@@ -1743,17 +1785,17 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  !......................................................................
-  !       graupel/hail density set (Hail = 400, Graupel = 500 from M2005)
-     
-  if (do_hail) then 
-     bgtmp = bh 
-     rhogtmp = rhoh
-  end if
-  if (do_graupel) then 
-     bgtmp = bg
-     rhogtmp = rhog
-  end if
+!  !......................................................................
+!  !       graupel/hail density set (Hail = 400, Graupel = 500 from M2005)
+!     
+!  if (do_hail) then 
+!     bgtmp = bh 
+!     rhogtmp = rhoh
+!  end if
+!  if (do_graupel) then 
+!     bgtmp = bg
+!     rhogtmp = rhog
+!  end if
 
   !  graupel/hail size distributions and properties
 
@@ -1806,7 +1848,6 @@ subroutine micro_mg_tend ( &
         end do
         !$acc end parallel
 
-        mdust = size(rndst,3)
         call contact_freezing(microp_uniform, t, p, rndst, nacon, pgam, lamc, qcic, ncic, &
                               relvar, mnucct, nnucct, mgncol*nlev, mdust)
      else
@@ -2714,6 +2755,8 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
+  !$acc compare (dumc(1:mgncol,1:nlev))
+
   ! obtain new slope parameter to avoid possible singularity
   call size_dist_param_basic_vect(mg_ice_props, dumi, dumni, lami, mgncol*nlev)
   call size_dist_param_liq_vect(mg_liq_props, dumc, dumnc, rho, pgam, lamc, mgncol*nlev)
@@ -2874,6 +2917,8 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
+  !$acc compare (dumc(1:mgncol,1:nlev))
+
   ! begin sedimentation
   ! ice
   call Sedimentation(mgncol,nlev,do_cldice,deltat,fi,fni,pdel_inv, &
@@ -2944,6 +2989,8 @@ subroutine micro_mg_tend ( &
      end do
   end do
   !$acc end parallel
+
+  !$acc compare (dumc(1:mgncol,1:nlev))
 
   ! calculate instantaneous processes (melting, homogeneous freezing)
   !====================================================================
@@ -3251,6 +3298,8 @@ subroutine micro_mg_tend ( &
      end do
   end do
   !$acc end parallel
+
+  !$acc compare (dumc(1:mgncol,1:nlev))
 
   ! cloud ice effective radius
   !-----------------------------------------------------------------
@@ -3696,7 +3745,8 @@ subroutine micro_mg_tend ( &
      end do
   end do
   !$acc end parallel
-  !!!$acc end data
+
+!$acc end data
 
 end subroutine micro_mg_tend
 
