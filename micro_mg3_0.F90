@@ -935,8 +935,8 @@ subroutine micro_mg_tend ( &
 !$acc         copyin (tmelt,gamma_br_plus4,gamma_bs_plus1,gamma_bs_plus4)      &
 !$acc         copyin (gamma_bi_plus4,gamma_bj_plus1,gamma_bj_plus4,rhmini)     &
 !$acc         copyin (xxlv_squared,xxls_squared,micro_mg_berg_eff_factor)      &
-!$acc         copyin (allow_sed_supersat,do_sb_physics,MG_PRECIP_FRAC_INCLOUD) &
-!$acc         copyin (MG_PRECIP_FRAC_OVERLAP,gamma_br_plus1,gamma_bi_plus1)
+!$acc         copyin (allow_sed_supersat,do_sb_physics,gamma_br_plus1)         &
+!$acc         copyin (gamma_bi_plus1)
 
   ! Return error message
   errstring = ' '
@@ -1004,7 +1004,23 @@ subroutine micro_mg_tend ( &
 !$acc      create  (lamc,n0i,lams,n0s,lamr,n0r,psacws,npsacws,pracs,npracs)    &
 !$acc      create  (pgam,prc,nprc,nprc1,pra,npra,prci,nprci,prai,nprai,pre)    &
 !$acc      create  (prds,psacr,ncic,niic,nsic,nric,qiic,qsic,qric,dumi,dumni)  &
-!$acc      create  (dumr,dumnr,dums,dumns,dumc,dumnc,qcic)
+!$acc      create  (dumr,dumnr,dums,dumns)   !!!,dumc,dumnc,qcic) &
+!!!!$acc      create  (qcsinksum_rate1ord,tlat,qvlat,qctend,qitend,nctend,rercld) &
+!!!!$acc      create  (nitend,qrtend,qstend,nrtend,nstend,bergstot,bergtot,effc)  &
+!!!!$acc      create  (effc_fn,effi,sadice,sadsnow,prect,preci,nevapr,evapsnow)   &
+!!!!$acc      create  (am_evp_st,prain,prodsnow,cmeout,deffi,pgamrad,psacwstot)   &
+!!!!$acc      create  (qsout,dsout,lflx,iflx,rflx,sflx,gflx,reff_rain,qssedten)   &
+!!!!$acc      create  (reff_snow,reff_grau,qcsevap,qisevap,qvres,cmeitot,vtrmc)   &
+!!!!$acc      create  (vtrmi,umr,ums,umg,qgsedten,qcsedten,qisedten,qrsedten)     &
+!!!!$acc      create  (pratot,prctot,mnuccctot,mnuccttot,msacwitot,freqg,qrout)   &
+!!!!$acc      create  (qgtend,ngtend,lamcrad,melttot,homotot,qcrestot,prer_evap)  &
+!!!!$acc      create  (prcitot,praitot,qirestot,mnuccrtot,mnuccritot,pracstot)    &
+!!!!$acc      create  (meltsdttot,frzrdttot,mnuccdtot,pracgtot,psacwgtot,fcsrfl)  &
+!!!!$acc      create  (pgsacwtot,pgracstot,prdgtot,qmultgtot,qmultrgtot,psacrtot) &
+!!!!$acc      create  (npracgtot,nscngtot,ngracstot,nmultgtot,nmultrgtot,nrout)   &
+!!!!$acc      create  (nsout,refl,arefl,npsacwgtot,areflz,frefl,csrfl,acsrfl)     &
+!!!!$acc      create  (ncai,ncal,qrout2,qsout2,nrout2,nsout2,drout2,dsout2,freqs) &
+!!!!$acc      create  (freqr,nfice,qcrat,qgout,dgout,ngout,qgout2,ngout2,dgout2)
 
   ! Copies of input concentrations that may be changed internally.
   !$acc parallel vector_length(VLEN)
@@ -2755,8 +2771,6 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  !$acc compare (dumc(1:mgncol,1:nlev))
-
   ! obtain new slope parameter to avoid possible singularity
   call size_dist_param_basic_vect(mg_ice_props, dumi, dumni, lami, mgncol*nlev)
   call size_dist_param_liq_vect(mg_liq_props, dumc, dumnc, rho, pgam, lamc, mgncol*nlev)
@@ -2917,8 +2931,6 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  !$acc compare (dumc(1:mgncol,1:nlev))
-
   ! begin sedimentation
   ! ice
   call Sedimentation(mgncol,nlev,do_cldice,deltat,fi,fni,pdel_inv, &
@@ -2989,8 +3001,6 @@ subroutine micro_mg_tend ( &
      end do
   end do
   !$acc end parallel
-
-  !$acc compare (dumc(1:mgncol,1:nlev))
 
   ! calculate instantaneous processes (melting, homogeneous freezing)
   !====================================================================
@@ -3298,8 +3308,6 @@ subroutine micro_mg_tend ( &
      end do
   end do
   !$acc end parallel
-
-  !$acc compare (dumc(1:mgncol,1:nlev))
 
   ! cloud ice effective radius
   !-----------------------------------------------------------------
@@ -3771,6 +3779,10 @@ subroutine calc_rercld(lamr, n0r, lamc, pgam, qric, qcic, ncic, rercld, vlen)
 
   integer :: i
 
+  !$acc data copy   (rercld) &
+  !$acc      copyin (lamr,n0r,lamc,pgam,qric,qcic,ncic) &
+  !$acc      create (Atmp,tmp,pgamp1)
+
   !$acc parallel vector_length(VLEN)
   !$acc loop gang vector
   do i=1,vlen
@@ -3802,6 +3814,7 @@ subroutine calc_rercld(lamr, n0r, lamc, pgam, qric, qcic, ncic, rercld, vlen)
   end do
   !$acc end parallel
 
+  !$acc end data
 end subroutine calc_rercld
 
 !========================================================================
