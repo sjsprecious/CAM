@@ -210,7 +210,7 @@ subroutine  wv_sat_svp_to_qsat_vect(es, p, qs, vlen)
 
   ! If pressure is less than SVP, set qs to maximum of 1.
 
-  !$acc declare present_or_copyin(epsilo,omeps)
+  !$acc data present (es,p,qs)
 
   !$acc parallel vector_length(VLEN)
   !$acc loop gang vector
@@ -222,7 +222,8 @@ subroutine  wv_sat_svp_to_qsat_vect(es, p, qs, vlen)
      end if
   end do
   !$acc end parallel
-
+  
+  !$acc end data
 end subroutine wv_sat_svp_to_qsat_vect
 
 subroutine wv_sat_qsat_water(t, p, es, qs, idx)
@@ -268,6 +269,8 @@ subroutine wv_sat_qsat_water_vect(t, p, es, qs, vlen, idx)
   integer,  intent(in), optional :: idx ! Scheme index
   integer :: i
 
+  !$acc data present (t,p,es,qs)
+
   call wv_sat_svp_water_vect(t, es, vlen, idx)
   call wv_sat_svp_to_qsat_vect(es, p, qs, vlen)
 
@@ -279,6 +282,7 @@ subroutine wv_sat_qsat_water_vect(t, p, es, qs, vlen, idx)
   end do
   !$acc end parallel
 
+  !$acc end data
 end subroutine wv_sat_qsat_water_vect
 
 subroutine wv_sat_qsat_ice(t, p, es, qs, idx)
@@ -324,6 +328,8 @@ subroutine wv_sat_qsat_ice_vect(t, p, es, qs, vlen, idx)
   integer,  intent(in), optional :: idx ! Scheme index
   integer :: i
 
+  !$acc data present (t,p,es,qs)
+
   call wv_sat_svp_ice_vect(t, es, vlen, idx)
   call wv_sat_svp_to_qsat_vect(es, p, qs, vlen)
 
@@ -335,6 +341,7 @@ subroutine wv_sat_qsat_ice_vect(t, p, es, qs, vlen, idx)
   end do
   !$acc end parallel
 
+  !$acc end data
 end subroutine wv_sat_qsat_ice_vect
 
 subroutine wv_sat_qsat_trans(t, p, es, qs, idx)
@@ -535,6 +542,7 @@ subroutine GoffGratch_svp_water_vect(t, es, vlen)
   integer :: i
   ! uncertain below -70 C
 
+  !$acc data present (t,es)
 
   !$acc parallel vector_length(VLEN)
   !$acc loop gang vector
@@ -547,6 +555,7 @@ subroutine GoffGratch_svp_water_vect(t, es, vlen)
   end do
   !$acc end parallel
 
+  !$acc end data
 end subroutine GoffGratch_svp_water_vect
 
 elemental function GoffGratch_svp_ice(t) result(es)
@@ -567,6 +576,7 @@ subroutine GoffGratch_svp_ice_vect(t, es, vlen)
   integer :: i
   ! good down to -100 C
 
+  !$acc data present (t,es)
 
   !$acc parallel vector_length(VLEN)
   !$acc loop gang vector
@@ -577,6 +587,7 @@ subroutine GoffGratch_svp_ice_vect(t, es, vlen)
   end do
   !$acc end parallel
 
+  !$acc end data
 end subroutine GoffGratch_svp_ice_vect
 
 ! Murphy & Koop (2005)
@@ -601,6 +612,8 @@ subroutine MurphyKoop_svp_water_vect(t, es, vlen)
   integer :: i
   ! (good for 123 < T < 332 K)
 
+  !$acc data present (t,es)
+
   !$acc parallel vector_length(VLEN)
   !$acc loop gang vector
   do i = 1, vlen
@@ -611,6 +624,7 @@ subroutine MurphyKoop_svp_water_vect(t, es, vlen)
   end do
   !$acc end parallel
 
+  !$acc end data
 end subroutine MurphyKoop_svp_water_vect
 
 elemental function MurphyKoop_svp_ice(t) result(es)
@@ -631,6 +645,8 @@ subroutine MurphyKoop_svp_ice_vect(t, es, vlen)
   integer :: i
   ! (good down to 110 K)
 
+  !$acc data present (t,es)
+
   !$acc parallel vector_length(VLEN)
   !$acc loop gang vector
   do i = 1, vlen
@@ -639,6 +655,7 @@ subroutine MurphyKoop_svp_ice_vect(t, es, vlen)
   end do
   !$acc end parallel
 
+  !$acc end data
 end subroutine MurphyKoop_svp_ice_vect
 
 ! Old CAM implementation, also labelled Goff & Gratch (1946)
@@ -682,6 +699,8 @@ subroutine OldGoffGratch_svp_water_vect(t,es,vlen)
   real(r8), dimension(vlen) :: ps, e1, e2, f1, f2, f3, f4, f5, f
   integer :: i
 
+  !$acc data present (t,es) &
+  !$acc      create  (ps,e1,e2,f1,f2,f3,f4,f5,f)
 
   !$acc parallel vector_length(VLEN)
   !$acc loop gang vector
@@ -699,6 +718,7 @@ subroutine OldGoffGratch_svp_water_vect(t,es,vlen)
   end do
   !$acc end parallel
 
+  !$acc end data
 end subroutine OldGoffGratch_svp_water_vect
 
 elemental function OldGoffGratch_svp_ice(t) result(es)
@@ -722,6 +742,9 @@ subroutine OldGoffGratch_svp_ice_vect(t,es,vlen)
   real(r8), dimension(vlen) :: term1, term2, term3
   integer :: i
 
+  !$acc data present (t,es) &
+  !$acc      create  (term1,term2,term3)
+
   !$acc parallel vector_length(VLEN)
   !$acc loop gang vector
   do i = 1, vlen
@@ -732,6 +755,7 @@ subroutine OldGoffGratch_svp_ice_vect(t,es,vlen)
   end do
   !$acc end parallel
 
+  !$acc end data
 end subroutine OldGoffGratch_svp_ice_vect
 
 ! Bolton (1980)
@@ -766,6 +790,8 @@ subroutine Bolton_svp_water_vect(t, es,vlen)
 
   integer :: i
 
+  !$acc data present (t,es)
+
   !$acc parallel vector_length(VLEN)
   !$acc loop gang vector
   do i = 1, vlen
@@ -773,6 +799,7 @@ subroutine Bolton_svp_water_vect(t, es,vlen)
   end do
   !$acc end parallel
 
+  !$acc end data
 end subroutine Bolton_svp_water_vect
 
 end module wv_sat_methods
