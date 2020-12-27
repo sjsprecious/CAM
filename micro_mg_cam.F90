@@ -1948,12 +1948,22 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
 
    real(r8), pointer :: pckdptr(:,:)
 
+#if defined (__OPENACC__)
+   real(r8), dimension(:,:), allocatable :: icimrst_subgrid, rei_subgrid, &
+                                          niic_subgrid
+#endif
+
    !-------------------------------------------------------------------------------
 
    lchnk = state%lchnk
    ncol  = state%ncol
    psetcols = state%psetcols
    ngrdcol  = state%ngrdcol
+
+#if defined (__OPENACC__)
+   allocate(icimrst_subgrid(ngrdcol,nlev-top_lev+1),rei_subgrid(ngrdcol,nlev-top_lev+1), &
+            niic_subgrid(ngrdcol,nlev-top_lev+1))
+#endif
 
    itim_old = pbuf_old_tim_idx()
 
@@ -3124,8 +3134,22 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    niic_grid(:ngrdcol,top_lev:) = ni_grid(:ngrdcol,top_lev:) / &
         max(mincld,icecldf_grid(:ngrdcol,top_lev:))
 
-   call size_dist_param_basic_vect(mg_ice_props, icimrst_grid(:ngrdcol,top_lev:), &
-        niic_grid(:ngrdcol,top_lev:), rei_grid(:ngrdcol,top_lev:), ngrdcol*(nlev-top_lev+1))
+#if defined (__OPENACC__)
+   icimrst_subgrid(1:ngrdcol,top_lev:nlev) = icimrst_grid(1:ngrdcol,top_lev:nlev)
+   niic_subgrid(1:ngrdcol,top_lev:nlev)    = niic_grid(1:ngrdcol,top_lev:nlev)
+   rei_subgrid(1:ngrdcol,top_lev:nlev)     = rei_grid(1:ngrdcol,top_lev:nlev)
+   !$acc data copyin  (mg_ice_props,icimrst_subgrid(1:ngrdcol,top_lev:nlev)) &
+   !$acc      copy    (niic_subgrid(1:ngrdcol,top_lev:nlev)) &
+   !$acc      copyout (rei_subgrid(1:ngrdcol,top_lev:nlev))
+   call size_dist_param_basic_vect(mg_ice_props, icimrst_subgrid, niic_subgrid, &
+                                   rei_subgrid, ngrdcol*(nlev-top_lev+1))
+   !$acc end data
+   rei_grid(1:ngrdcol,top_lev:nlev) = rei_subgrid(1:ngrdcol,top_lev:nlev)
+#else
+   call size_dist_param_basic_vect(mg_ice_props, icimrst_grid(1:ngrdcol,top_lev:), &
+                                   niic_grid(1:ngrdcol,top_lev:), rei_grid(1:ngrdcol,top_lev:), &
+                                   ngrdcol*(nlev-top_lev+1))
+#endif
 
    where (icimrst_grid(:ngrdcol,top_lev:) >= qsmall)
       rei_grid(:ngrdcol,top_lev:) = 1.5_r8/rei_grid(:ngrdcol,top_lev:) &
@@ -3590,6 +3614,10 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
 
    ! ptend_loc is deallocated in physics_update above
    call physics_state_dealloc(state_loc)
+
+#if defined (__OPENACC__)
+   deallocate(icimrst_subgrid,rei_subgrid,niic_subgrid)
+#endif
 
 end subroutine micro_mg_cam_tend_pack
 

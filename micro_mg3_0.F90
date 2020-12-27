@@ -974,6 +974,8 @@ subroutine micro_mg_tend ( &
 !$acc data copyin  (t,q,qcn,qin,ncn,nin,qrn,qsn,nrn,nsn,qgr,ngr,relvar,frzimm) &
 !$acc      copyin  (accre_enhan,p,pdel,cldn,liqcldf,icecldf,qsatfac,frzcnt)    &
 !$acc      copyin  (naai,npccn,rndst,nacon,tnd_qsnow,tnd_nsnow,re_ice,frzdep)  &
+!$acc      copyin  (mg_liq_props,mg_ice_props,mg_rain_props,mg_graupel_props)  &
+!$acc      copyin  (mg_hail_props,mg_snow_props) &
 !$acc      copyout (qcsinksum_rate1ord,tlat,qvlat,qctend,qitend,nctend,rercld) &
 !$acc      copyout (nitend,qrtend,qstend,nrtend,nstend,bergstot,bergtot,effc)  &
 !$acc      copyout (effc_fn,effi,sadice,sadsnow,prect,preci,nevapr,evapsnow)   &
@@ -991,7 +993,7 @@ subroutine micro_mg_tend ( &
 !$acc      copyout (ncai,ncal,qrout2,qsout2,nrout2,nsout2,drout2,dsout2,freqs) &
 !$acc      copyout (freqr,nfice,qcrat,qgout,dgout,ngout,qgout2,ngout2,dgout2)  &
 !$acc      create  (qc,qi,nc,ni,qr,qs,nr,ns,qg,ng,rho,dv,mu,sc,rhof,pdel_inv)  &
-!$acc      create  (precip_frac,cldm,icldm,lcldm,qsfm,qgic,ngic,qgic,lamg,n0g) &
+!$acc      create  (precip_frac,cldm,icldm,lcldm,qsfm,qgic,ngic,lamg,n0g)      &
 !$acc      create  (minstgm,ninstgm,pracg,psacwg,nmultg,nmultrg,npracg,nscng)  &
 !$acc      create  (nsagg,nragg,ngracs,npsacwg,prdg,qmultg,qmultrg,ung,agn)    &
 !$acc      create  (dumg,dumng,dum_2D,dum1A,dum2A,dum3A,dumni0A2D,dumns0A2D)   &
@@ -1004,7 +1006,7 @@ subroutine micro_mg_tend ( &
 !$acc      create  (lamc,n0i,lams,n0s,lamr,n0r,psacws,npsacws,pracs,npracs)    &
 !$acc      create  (pgam,prc,nprc,nprc1,pra,npra,prci,nprci,prai,nprai,pre)    &
 !$acc      create  (prds,psacr,ncic,niic,nsic,nric,qiic,qsic,qric,dumi,dumni)  &
-!$acc      create  (dumr,dumnr,dums,dumns)   !!!,dumc,dumnc,qcic) &
+!$acc      create  (dumr,dumnr,dums,dumns,qtmpAI,qvnAI)   !!!,dumc,dumnc,qcic) &
 !!!!$acc      create  (qcsinksum_rate1ord,tlat,qvlat,qctend,qitend,nctend,rercld) &
 !!!!$acc      create  (nitend,qrtend,qstend,nrtend,nstend,bergstot,bergtot,effc)  &
 !!!!$acc      create  (effc_fn,effi,sadice,sadsnow,prect,preci,nevapr,evapsnow)   &
