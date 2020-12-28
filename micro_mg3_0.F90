@@ -1006,23 +1006,7 @@ subroutine micro_mg_tend ( &
 !$acc      create  (lamc,n0i,lams,n0s,lamr,n0r,psacws,npsacws,pracs,npracs)    &
 !$acc      create  (pgam,prc,nprc,nprc1,pra,npra,prci,nprci,prai,nprai,pre)    &
 !$acc      create  (prds,psacr,ncic,niic,nsic,nric,qiic,qsic,qric,dumi,dumni)  &
-!$acc      create  (dumr,dumnr,dums,dumns,qtmpAI,qvnAI)   !!!,dumc,dumnc,qcic) &
-!!!!$acc      create  (qcsinksum_rate1ord,tlat,qvlat,qctend,qitend,nctend,rercld) &
-!!!!$acc      create  (nitend,qrtend,qstend,nrtend,nstend,bergstot,bergtot,effc)  &
-!!!!$acc      create  (effc_fn,effi,sadice,sadsnow,prect,preci,nevapr,evapsnow)   &
-!!!!$acc      create  (am_evp_st,prain,prodsnow,cmeout,deffi,pgamrad,psacwstot)   &
-!!!!$acc      create  (qsout,dsout,lflx,iflx,rflx,sflx,gflx,reff_rain,qssedten)   &
-!!!!$acc      create  (reff_snow,reff_grau,qcsevap,qisevap,qvres,cmeitot,vtrmc)   &
-!!!!$acc      create  (vtrmi,umr,ums,umg,qgsedten,qcsedten,qisedten,qrsedten)     &
-!!!!$acc      create  (pratot,prctot,mnuccctot,mnuccttot,msacwitot,freqg,qrout)   &
-!!!!$acc      create  (qgtend,ngtend,lamcrad,melttot,homotot,qcrestot,prer_evap)  &
-!!!!$acc      create  (prcitot,praitot,qirestot,mnuccrtot,mnuccritot,pracstot)    &
-!!!!$acc      create  (meltsdttot,frzrdttot,mnuccdtot,pracgtot,psacwgtot,fcsrfl)  &
-!!!!$acc      create  (pgsacwtot,pgracstot,prdgtot,qmultgtot,qmultrgtot,psacrtot) &
-!!!!$acc      create  (npracgtot,nscngtot,ngracstot,nmultgtot,nmultrgtot,nrout)   &
-!!!!$acc      create  (nsout,refl,arefl,npsacwgtot,areflz,frefl,csrfl,acsrfl)     &
-!!!!$acc      create  (ncai,ncal,qrout2,qsout2,nrout2,nsout2,drout2,dsout2,freqs) &
-!!!!$acc      create  (freqr,nfice,qcrat,qgout,dgout,ngout,qgout2,ngout2,dgout2)
+!$acc      create  (dumr,dumnr,dums,dumns,qtmpAI,qvnAI,dumc,dumnc,qcic)
 
   ! Copies of input concentrations that may be changed internally.
   !$acc parallel vector_length(VLEN)
@@ -3781,9 +3765,8 @@ subroutine calc_rercld(lamr, n0r, lamc, pgam, qric, qcic, ncic, rercld, vlen)
 
   integer :: i
 
-  !$acc data copy   (rercld) &
-  !$acc      copyin (lamr,n0r,lamc,pgam,qric,qcic,ncic) &
-  !$acc      create (Atmp,tmp,pgamp1)
+  !$acc data present (rercld,lamr,n0r,lamc,pgam,qric,qcic,ncic) &
+  !$acc      create  (Atmp,tmp,pgamp1)
 
   !$acc parallel vector_length(VLEN)
   !$acc loop gang vector
@@ -3858,6 +3841,10 @@ subroutine Sedimentation(mgncol,nlev,do_cldice,deltat,fx,fnx,pdel_inv,qxtend,nxt
 
    ! loop over sedimentation sub-time step to ensure stability
    !==============================================================
+
+   !$acc data present (fx,fnx,pdel_inv,qxtend,nxtend,qxsedten,dumx,dumnx) &
+   !$acc      present (prect,xflx,xxlx,qxsevap,xcldm,tlat,qvlat,preci)    &
+   !$acc      create  (faloutx,faloutnx)
 
    !$acc parallel vector_length(VLEN)
    !$acc loop gang vector private(faltndnx,faltndx,faltndqxe,n,k,nstep,rnstep,faloutx,faloutnx,dum1)
@@ -3937,6 +3924,7 @@ subroutine Sedimentation(mgncol,nlev,do_cldice,deltat,fx,fnx,pdel_inv,qxtend,nxt
    end do     ! i loop of 1, mgncol
    !$acc end parallel
 
+   !$acc end data
 end subroutine Sedimentation
 
 !========================================================================
