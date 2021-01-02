@@ -628,8 +628,6 @@ subroutine size_dist_param_liq_vect(props, qcic, ncic, rho, pgam, lamc, vlen)
   !$acc data present (props,qcic,ncic,rho,pgam,lamc) &
   !$acc      create  (tmp,pgamp1,shapeC,lbnd,ubnd)
 
-  cnt = COUNT(qcic>qsmall)
-  if(cnt>0) then
     !$acc parallel vector_length(VLEN)
     !$acc loop gang vector
     do i=1,vlen
@@ -665,7 +663,6 @@ subroutine size_dist_param_liq_vect(props, qcic, ncic, rho, pgam, lamc, vlen)
     !$acc end parallel 
 
     call size_dist_param_basic(props, qcic, ncic, shapeC, lbnd, ubnd, lamc, vlen)
-  end if
 
   !$acc parallel vector_length(VLEN)
   !$acc loop gang vector

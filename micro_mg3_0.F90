@@ -3843,8 +3843,7 @@ subroutine Sedimentation(mgncol,nlev,do_cldice,deltat,fx,fnx,pdel_inv,qxtend,nxt
    !==============================================================
 
    !$acc data present (fx,fnx,pdel_inv,qxtend,nxtend,qxsedten,dumx,dumnx) &
-   !$acc      present (prect,xflx,xxlx,qxsevap,xcldm,tlat,qvlat,preci)    &
-   !$acc      create  (faloutx,faloutnx)
+   !$acc      present (prect,xflx,xxlx,qxsevap,xcldm,tlat,qvlat,preci)
 
    !$acc parallel vector_length(VLEN)
    !$acc loop gang vector private(faltndnx,faltndx,faltndqxe,n,k,nstep,rnstep,faloutx,faloutnx,dum1)
@@ -3872,13 +3871,11 @@ subroutine Sedimentation(mgncol,nlev,do_cldice,deltat,fx,fnx,pdel_inv,qxtend,nxt
          faloutx(0)  = 0._r8
          faloutnx(0) = 0._r8
          if (do_cldice) then
-            !$acc loop gang vector
             do k=1,nlev
                faloutx(k)  = fx(i,k)  * dumx(i,k)
                faloutnx(k) = fnx(i,k) * dumnx(i,k)
             end do
          else
-            !$acc loop gang vector
             do k=1,nlev
                faloutx(k)  = 0._r8
                faloutnx(k) = 0._r8
