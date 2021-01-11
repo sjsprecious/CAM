@@ -200,9 +200,9 @@ end function wv_sat_svp_to_qsat
 
 ! Get saturation specific humidity given pressure and SVP.
 ! Specific humidity is limited to range 0-1.
-subroutine  wv_sat_svp_to_qsat_vect(es, p, qs, vlen)
+subroutine  wv_sat_svp_to_qsat_vect(es, p, qs, vlen, queue)
 
-  integer,  intent(in) :: vlen
+  integer,  intent(in) :: vlen, queue
   real(r8), intent(in)  :: es(vlen)  ! SVP
   real(r8), intent(in)  :: p(vlen)   ! Current pressure.
   real(r8), intent(out) :: qs(vlen)
@@ -212,7 +212,7 @@ subroutine  wv_sat_svp_to_qsat_vect(es, p, qs, vlen)
 
   !$acc data present (es,p,qs)
 
-  !$acc parallel vector_length(VLEN)
+  !$acc parallel vector_length(VLEN) async(queue)
   !$acc loop gang vector
   do i=1,vlen
      if ( (p(i) - es(i)) <= 0._r8 ) then
@@ -251,7 +251,7 @@ subroutine wv_sat_qsat_water(t, p, es, qs, idx)
 
 end subroutine wv_sat_qsat_water
 
-subroutine wv_sat_qsat_water_vect(t, p, es, qs, vlen, idx)
+subroutine wv_sat_qsat_water_vect(t, p, es, qs, vlen, queue, idx)
   !------------------------------------------------------------------!
   ! Purpose:                                                         !
   !   Calculate SVP over water at a given temperature, and then      !
@@ -259,7 +259,7 @@ subroutine wv_sat_qsat_water_vect(t, p, es, qs, vlen, idx)
   !------------------------------------------------------------------!
   ! Inputs
 
-  integer,  intent(in) :: vlen
+  integer,  intent(in) :: vlen, queue
   real(r8), intent(in) :: t(vlen)    ! Temperature
   real(r8), intent(in) :: p(vlen)    ! Pressure
   ! Outputs
@@ -271,10 +271,10 @@ subroutine wv_sat_qsat_water_vect(t, p, es, qs, vlen, idx)
 
   !$acc data present (t,p,es,qs)
 
-  call wv_sat_svp_water_vect(t, es, vlen, idx)
-  call wv_sat_svp_to_qsat_vect(es, p, qs, vlen)
+  call wv_sat_svp_water_vect(t, es, vlen, queue, idx)
+  call wv_sat_svp_to_qsat_vect(es, p, qs, vlen, queue)
 
-  !$acc parallel vector_length(VLEN)
+  !$acc parallel vector_length(VLEN) async(queue)
   !$acc loop gang vector
   do i=1,vlen
      ! Ensures returned es is consistent with limiters on qs.
@@ -310,7 +310,7 @@ subroutine wv_sat_qsat_ice(t, p, es, qs, idx)
 
 end subroutine wv_sat_qsat_ice
 
-subroutine wv_sat_qsat_ice_vect(t, p, es, qs, vlen, idx)
+subroutine wv_sat_qsat_ice_vect(t, p, es, qs, vlen, queue, idx)
   !------------------------------------------------------------------!
   ! Purpose:                                                         !
   !   Calculate SVP over ice at a given temperature, and then        !
@@ -318,7 +318,7 @@ subroutine wv_sat_qsat_ice_vect(t, p, es, qs, vlen, idx)
   !------------------------------------------------------------------!
   ! Inputs
 
-  integer,  intent(in) :: vlen
+  integer,  intent(in) :: vlen, queue
   real(r8), intent(in) :: t(vlen)    ! Temperature
   real(r8), intent(in) :: p(vlen)    ! Pressure
   ! Outputs
@@ -330,10 +330,10 @@ subroutine wv_sat_qsat_ice_vect(t, p, es, qs, vlen, idx)
 
   !$acc data present (t,p,es,qs)
 
-  call wv_sat_svp_ice_vect(t, es, vlen, idx)
-  call wv_sat_svp_to_qsat_vect(es, p, qs, vlen)
+  call wv_sat_svp_ice_vect(t, es, vlen, queue, idx)
+  call wv_sat_svp_to_qsat_vect(es, p, qs, vlen, queue)
 
-  !$acc parallel vector_length(VLEN)
+  !$acc parallel vector_length(VLEN) async(queue)
   !$acc loop gang vector
   do i=1,vlen
      ! Ensures returned es is consistent with limiters on qs.
@@ -399,8 +399,8 @@ function wv_sat_svp_water(t, idx) result(es)
 
 end function wv_sat_svp_water
 
-subroutine  wv_sat_svp_water_vect(t, es, vlen, idx)
-  integer,  intent(in) :: vlen
+subroutine  wv_sat_svp_water_vect(t, es, vlen, queue, idx)
+  integer,  intent(in) :: vlen, queue
   real(r8), intent(in) :: t(vlen)
   integer,  intent(in), optional :: idx
   real(r8), intent(out) :: es(vlen)
@@ -415,13 +415,13 @@ subroutine  wv_sat_svp_water_vect(t, es, vlen, idx)
 
   select case (use_idx)
   case(GoffGratch_idx)
-     call GoffGratch_svp_water_vect(t,es,vlen)
+     call GoffGratch_svp_water_vect(t,es,vlen,queue)
   case(MurphyKoop_idx)
-     call MurphyKoop_svp_water_vect(t,es,vlen)
+     call MurphyKoop_svp_water_vect(t,es,vlen,queue)
   case(OldGoffGratch_idx)
-     call OldGoffGratch_svp_water_vect(t,es,vlen)
+     call OldGoffGratch_svp_water_vect(t,es,vlen,queue)
   case(Bolton_idx)
-     call Bolton_svp_water_vect(t,es,vlen)
+     call Bolton_svp_water_vect(t,es,vlen,queue)
   end select
 
 end subroutine wv_sat_svp_water_vect
@@ -452,8 +452,8 @@ function wv_sat_svp_ice(t, idx) result(es)
 
 end function wv_sat_svp_ice
 
-subroutine wv_sat_svp_ice_vect(t, es, vlen, idx)
-  integer,  intent(in) :: vlen
+subroutine wv_sat_svp_ice_vect(t, es, vlen, queue, idx)
+  integer,  intent(in) :: vlen, queue
   real(r8), intent(in) :: t(vlen)
   integer,  intent(in), optional :: idx
   real(r8), intent(out) :: es(vlen)
@@ -469,13 +469,13 @@ subroutine wv_sat_svp_ice_vect(t, es, vlen, idx)
 
   select case (use_idx)
   case(GoffGratch_idx)
-     call GoffGratch_svp_ice_vect(t,es,vlen)
+     call GoffGratch_svp_ice_vect(t,es,vlen,queue)
   case(MurphyKoop_idx)
-     call MurphyKoop_svp_ice_vect(t,es,vlen)
+     call MurphyKoop_svp_ice_vect(t,es,vlen,queue)
   case(OldGoffGratch_idx)
-     call OldGoffGratch_svp_ice_vect(t,es,vlen)
+     call OldGoffGratch_svp_ice_vect(t,es,vlen,queue)
   case(Bolton_idx)
-     call Bolton_svp_water_vect(t,es,vlen)
+     call Bolton_svp_water_vect(t,es,vlen,queue)
   end select
 
 end subroutine wv_sat_svp_ice_vect
@@ -535,8 +535,8 @@ elemental function GoffGratch_svp_water(t) result(es)
 
 end function GoffGratch_svp_water
 
-subroutine GoffGratch_svp_water_vect(t, es, vlen)
-  integer, intent(in) :: vlen
+subroutine GoffGratch_svp_water_vect(t, es, vlen, queue)
+  integer, intent(in) :: vlen, queue
   real(r8), intent(in)  :: t(vlen)  ! Temperature in Kelvin
   real(r8), intent(out) :: es(vlen) ! SVP in Pa
   integer :: i
@@ -544,7 +544,7 @@ subroutine GoffGratch_svp_water_vect(t, es, vlen)
 
   !$acc data present (t,es)
 
-  !$acc parallel vector_length(VLEN)
+  !$acc parallel vector_length(VLEN) async(queue)
   !$acc loop gang vector
   do i=1,vlen
      es(i) = 10._r8**(-7.90298_r8*(tboil/t(i)-1._r8)+ &
@@ -569,8 +569,8 @@ elemental function GoffGratch_svp_ice(t) result(es)
 
 end function GoffGratch_svp_ice
 
-subroutine GoffGratch_svp_ice_vect(t, es, vlen)
-  integer, intent(in) :: vlen
+subroutine GoffGratch_svp_ice_vect(t, es, vlen, queue)
+  integer, intent(in) :: vlen, queue
   real(r8), intent(in)  :: t(vlen)  ! Temperature in Kelvin
   real(r8), intent(out) :: es(vlen)             ! SVP in Pa
   integer :: i
@@ -578,7 +578,7 @@ subroutine GoffGratch_svp_ice_vect(t, es, vlen)
 
   !$acc data present (t,es)
 
-  !$acc parallel vector_length(VLEN)
+  !$acc parallel vector_length(VLEN) async(queue)
   !$acc loop gang vector
   do i=1,vlen
      es(i) = 10._r8**(-9.09718_r8*(h2otrip/t(i)-1._r8)-3.56654_r8* &
@@ -604,8 +604,8 @@ elemental function MurphyKoop_svp_water(t) result(es)
 
 end function MurphyKoop_svp_water
 
-subroutine MurphyKoop_svp_water_vect(t, es, vlen)
-  integer, intent(in)   :: vlen
+subroutine MurphyKoop_svp_water_vect(t, es, vlen, queue)
+  integer, intent(in)   :: vlen, queue
   real(r8), intent(in)  :: t(vlen)  ! Temperature in Kelvin
   real(r8), intent(out) :: es(vlen)             ! SVP in Pa
   
@@ -614,7 +614,7 @@ subroutine MurphyKoop_svp_water_vect(t, es, vlen)
 
   !$acc data present (t,es)
 
-  !$acc parallel vector_length(VLEN)
+  !$acc parallel vector_length(VLEN) async(queue)
   !$acc loop gang vector
   do i = 1, vlen
      es(i) = exp(54.842763_r8 - (6763.22_r8 / t(i)) - (4.210_r8 * log(t(i))) + &
@@ -637,8 +637,8 @@ elemental function MurphyKoop_svp_ice(t) result(es)
 
 end function MurphyKoop_svp_ice
 
-subroutine MurphyKoop_svp_ice_vect(t, es, vlen)
-  integer, intent(in)   :: vlen
+subroutine MurphyKoop_svp_ice_vect(t, es, vlen, queue)
+  integer, intent(in)   :: vlen, queue
   real(r8), intent(in) :: t(vlen)  ! Temperature in Kelvin
   real(r8), intent(out) :: es(vlen)             ! SVP in Pa
   
@@ -647,7 +647,7 @@ subroutine MurphyKoop_svp_ice_vect(t, es, vlen)
 
   !$acc data present (t,es)
 
-  !$acc parallel vector_length(VLEN)
+  !$acc parallel vector_length(VLEN) async(queue)
   !$acc loop gang vector
   do i = 1, vlen
      es(i) = exp(9.550426_r8 - (5723.265_r8 / t(i)) + (3.53068_r8 * log(t(i))) &
@@ -691,8 +691,8 @@ elemental function OldGoffGratch_svp_water(t) result(es)
   
 end function OldGoffGratch_svp_water
 
-subroutine OldGoffGratch_svp_water_vect(t,es,vlen)
-  integer, intent(in) :: vlen
+subroutine OldGoffGratch_svp_water_vect(t,es,vlen,queue)
+  integer, intent(in) :: vlen, queue
   real(r8), intent(in)  :: t(vlen)
   real(r8), intent(out) :: es(vlen)
 
@@ -702,7 +702,7 @@ subroutine OldGoffGratch_svp_water_vect(t,es,vlen)
   !$acc data present (t,es) &
   !$acc      create  (ps,e1,e2,f1,f2,f3,f4,f5,f)
 
-  !$acc parallel vector_length(VLEN)
+  !$acc parallel vector_length(VLEN) async(queue)
   !$acc loop gang vector
   do i = 1, vlen
      ps(i) = 1013.246_r8
@@ -734,8 +734,8 @@ elemental function OldGoffGratch_svp_ice(t) result(es)
   
 end function OldGoffGratch_svp_ice
 
-subroutine OldGoffGratch_svp_ice_vect(t,es,vlen)
-  integer, intent(in) :: vlen
+subroutine OldGoffGratch_svp_ice_vect(t,es,vlen,queue)
+  integer, intent(in) :: vlen, queue
   real(r8), intent(in) :: t(vlen)
   real(r8), intent(out) :: es(vlen)
   
@@ -745,7 +745,7 @@ subroutine OldGoffGratch_svp_ice_vect(t,es,vlen)
   !$acc data present (t,es) &
   !$acc      create  (term1,term2,term3)
 
-  !$acc parallel vector_length(VLEN)
+  !$acc parallel vector_length(VLEN) async(queue)
   !$acc loop gang vector
   do i = 1, vlen
      term1(i) = 2.01889049_r8/(tmelt/t(i))
@@ -779,12 +779,12 @@ elemental function Bolton_svp_water(t) result(es)
 
 end function Bolton_svp_water
 
-subroutine Bolton_svp_water_vect(t, es,vlen)
+subroutine Bolton_svp_water_vect(t, es, vlen, queue)
   real(r8),parameter :: c1 = 611.2_r8
   real(r8),parameter :: c2 = 17.67_r8
   real(r8),parameter :: c3 = 243.5_r8
 
-  integer, intent(in)   :: vlen
+  integer, intent(in)   :: vlen, queue
   real(r8), intent(in)  :: t(vlen)  ! Temperature in Kelvin
   real(r8), intent(out) :: es(vlen)             ! SVP in Pa
 
@@ -792,7 +792,7 @@ subroutine Bolton_svp_water_vect(t, es,vlen)
 
   !$acc data present (t,es)
 
-  !$acc parallel vector_length(VLEN)
+  !$acc parallel vector_length(VLEN) async(queue)
   !$acc loop gang vector
   do i = 1, vlen
      es(i) = c1*exp( (c2*(t(i) - tmelt))/((t(i) - tmelt)+c3) )

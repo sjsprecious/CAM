@@ -616,6 +616,8 @@ subroutine zm_mphy(su,    qu,   mu,   du,   eu,    cmel,  cmei,  zf,   pm,   te,
   real(r8)  rmean, beta6, beta66, r6, r6c
   real(r8)  temp1, temp2, temp3, temp4   ! variable to store output which is not required by this routine
 
+  integer, parameter :: queue1 = 1
+
 !ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 ! initialization
 !ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
@@ -1223,7 +1225,7 @@ subroutine zm_mphy(su,    qu,   mu,   du,   eu,    cmel,  cmei,  zf,   pm,   te,
               ! Autoconversion of cloud ice to snow
               ! similar to Ferrier (1994)
 
-              call ice_autoconversion(t(i,k), qiic(i,k), lami(k), n0i(k), dcs, prci(k), nprci(k), 1)  
+              call ice_autoconversion(t(i,k), qiic(i,k), lami(k), n0i(k), dcs, prci(k), nprci(k), 1, queue1) 
 
               ! provisional snow mixing ratio and number concentration (qniic and nsic) 
               ! at boundary are estimated via autoconversion
@@ -1322,7 +1324,7 @@ subroutine zm_mphy(su,    qu,   mu,   du,   eu,    cmel,  cmei,  zf,   pm,   te,
               ! this is hard-wired for bs = 0.4 for now
               ! ignore self-collection of cloud ice
 
-              call snow_self_aggregation(t(i,k), rho(i,k), asn(i,k), rhosn, qniic(i,k), nsic(i,k), nsagg(k), 1)
+              call snow_self_aggregation(t(i,k), rho(i,k), asn(i,k), rhosn, qniic(i,k), nsic(i,k), nsagg(k), 1, queue1)
 
               !.......................................................................
               ! accretion of cloud droplets onto snow/graupel
@@ -1334,38 +1336,38 @@ subroutine zm_mphy(su,    qu,   mu,   du,   eu,    cmel,  cmei,  zf,   pm,   te,
 
               call accrete_cloud_water_snow(t(i,k), rho(i,k), asn(i,k), uns(k), mua(i,k),  &
                      qcic(i,k), ncic(i,k), qniic(i,k), pgam(i,k), lamc(i,k), lams(k), n0s(k), &
-                     psacws(k), npsacws(k), 1) 
+                     psacws(k), npsacws(k), 1, queue1) 
 
               ! secondary ice production due to accretion of droplets by snow 
               ! (Hallet-Mossop process) (from Cotton et al., 1986)
 
-              call secondary_ice_production(t(i,k), psacws(k), msacwi(k), nsacwi(k), 1)
+              call secondary_ice_production(t(i,k), psacws(k), msacwi(k), nsacwi(k), 1, queue1)
 
               !.......................................................................
               ! accretion of rain water by snow
               ! formula from ikawa and saito, 1991, used by reisner et al., 1998
 
               call accrete_rain_snow(t(i,k), rho(i,k), umr(k), ums(k), unr(k), uns(k), qric(i,k),  &
-                        qniic(i,k), lamr(k), n0r(k), lams(k), n0s(k), pracs(k), npracs(k), 1 )
+                        qniic(i,k), lamr(k), n0r(k), lams(k), n0s(k), pracs(k), npracs(k), 1, queue1)
 
               !.......................................................................
               ! heterogeneous freezing of rain drops
               ! follows from Bigg (1953)
 
-              call heterogeneous_rain_freezing(t(i,k), qric(i,k), nric(i,k), lamr(k), mnuccr(k), nnuccr(k), 1)
+              call heterogeneous_rain_freezing(t(i,k), qric(i,k), nric(i,k), lamr(k), mnuccr(k), nnuccr(k), 1, queue1)
 
               !.......................................................................
               ! accretion of cloud liquid water by rain
               ! formula from Khrouditnov and Kogan (2000)
               ! gravitational collection kernel, droplet fall speed neglected
 
-              call accrete_cloud_water_rain(.true., qric(i,k), qcic(i,k), ncic(i,k), [1._r8], [0._r8], pra(k), npra(k), 1) 
+              call accrete_cloud_water_rain(.true., qric(i,k), qcic(i,k), ncic(i,k), [1._r8], [0._r8], pra(k), npra(k), 1, queue1) 
 
               !.......................................................................
               ! Self-collection of rain drops
               ! from Beheng(1994)
 
-              call self_collection_rain(rho(i,k), qric(i,k), nric(i,k), nragg(k), 1)
+              call self_collection_rain(rho(i,k), qric(i,k), nric(i,k), nragg(k), 1, queue1)
 
               !.......................................................................
               ! Accretion of cloud ice by snow
@@ -1373,7 +1375,9 @@ subroutine zm_mphy(su,    qu,   mu,   du,   eu,    cmel,  cmei,  zf,   pm,   te,
               ! and Ds >> Di for continuous collection
 
               call accrete_cloud_ice_snow(t(i,k), rho(i,k), asn(i,k), qiic(i,k), niic(i,k),    &
-                         qniic(i,k), lams(k), n0s(k), prai(k), nprai(k), 1)
+                         qniic(i,k), lams(k), n0s(k), prai(k), nprai(k), 1, queue1)
+
+              !$acc wait (queue1)
 
               !.......................................................................
               ! fallout term
