@@ -504,6 +504,12 @@ subroutine micro_mg_tend ( &
        graupel_rime_splintering, &
        evaporate_sublimate_precip_graupel
 
+#if defined(__OPENACC__)
+  use openacc
+  use cam_abortutils, only: endrun
+  use mpishorthand,  only : mpicom
+#endif
+
   !Authors: Hugh Morrison, Andrew Gettelman, NCAR, Peter Caldwell, LLNL
   ! e-mail: morrison@ucar.edu, andrew@ucar.edu
 
@@ -938,6 +944,11 @@ subroutine micro_mg_tend ( &
   real(r8) :: irad
   real(r8) :: ifrac
 
+#if defined(__OPENACC__)
+  ! temporary variables for MPI rank and device number information
+  integer  :: rank, ierror, num_dev
+#endif
+
   !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
 !$acc declare copyin (nccons,nicons,ngcons,ncnst,ninst,ngnst,dcs,g,r,rv,cpp)   &
@@ -981,6 +992,21 @@ subroutine micro_mg_tend ( &
   end if
 
   mdust = size(rndst,3)
+
+#if defined(__OPENACC__)
+  ! get current MPI rank
+  call mpi_comm_rank (mpicom, rank, ierror)
+  if (ierror /= 0) then
+     call endrun("Fail to get the MPI rank info inside the MG3 subroutine!")
+  end if
+  ! get available GPU device number 
+  num_dev = acc_get_num_devices( acc_device_default )
+  if (num_dev == 0) then
+     call endrun("Fail to find GPU on this node!")
+  end if
+  ! choose different GPUs for different MPI ranks
+  call acc_set_device_num( mod(rank, num_dev), acc_device_default ) 
+#endif
 
 !$acc data copyin  (t,q,qcn,qin,ncn,nin,qrn,qsn,nrn,nsn,qgr,ngr,relvar,frzimm, &
 !$acc               accre_enhan,p,pdel,cldn,liqcldf,icecldf,qsatfac,frzcnt,    &
