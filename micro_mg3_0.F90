@@ -506,6 +506,7 @@ subroutine micro_mg_tend ( &
 
 #if defined(__OPENACC__)
   use openacc
+  use cam_logfile,    only: iulog
   use cam_abortutils, only: endrun
   use mpishorthand,  only : mpicom
 #endif
@@ -951,14 +952,14 @@ subroutine micro_mg_tend ( &
 
   !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
-!$acc declare copyin (nccons,nicons,ngcons,ncnst,ninst,ngnst,dcs,g,r,rv,cpp)   &
-!$acc         copyin (xxlv,xlf,microp_uniform,do_cldice,use_hetfrz_classnuc)   &
-!$acc         copyin (do_hail,do_graupel,rhosu,icenuct,snowmelt,rainfrze,xxls) &
-!$acc         copyin (tmelt,gamma_br_plus4,gamma_bs_plus1,gamma_bs_plus4)      &
-!$acc         copyin (gamma_bi_plus4,gamma_bj_plus1,gamma_bj_plus4,rhmini)     &
-!$acc         copyin (xxlv_squared,xxls_squared,micro_mg_berg_eff_factor)      &
-!$acc         copyin (allow_sed_supersat,do_sb_physics,gamma_br_plus1)         &
-!$acc         copyin (gamma_bi_plus1)
+!$acc declare copyin (nccons,nicons,ngcons,ncnst,ninst,ngnst,dcs,g,r,rv,cpp,   &
+!$acc                 xxlv,xlf,microp_uniform,do_cldice,use_hetfrz_classnuc,   &
+!$acc                 do_hail,do_graupel,rhosu,icenuct,snowmelt,rainfrze,xxls, &
+!$acc                 tmelt,rhmini,xxlv_squared,xxls_squared,do_sb_physics,    &
+!$acc                 gamma_br_plus4,gamma_bs_plus1,gamma_bs_plus4,            &
+!$acc                 gamma_bi_plus4,gamma_bj_plus1,gamma_bj_plus4,            &
+!$acc                 gamma_br_plus1,gamma_bi_plus1,gamma_bg_plus4,            &
+!$acc                 gamma_bg_plus1,micro_mg_berg_eff_factor,allow_sed_supersat)
 
   ! Return error message
   errstring = ' '
@@ -1000,12 +1001,13 @@ subroutine micro_mg_tend ( &
      call endrun("Fail to get the MPI rank info inside the MG3 subroutine!")
   end if
   ! get available GPU device number 
-  num_dev = acc_get_num_devices( acc_device_default )
-  if (num_dev == 0) then
-     call endrun("Fail to find GPU on this node!")
-  end if
+!  num_dev = acc_get_num_devices( acc_device_default )
+!  if (num_dev == 0) then
+!     call endrun("Fail to find GPU on this node!")
+!  end if
+!  write(iulog, *) "Number of GPU = ", num_dev
   ! choose different GPUs for different MPI ranks
-  call acc_set_device_num( mod(rank, num_dev), acc_device_default ) 
+!  call acc_set_device_num( mod(rank, num_dev), acc_device_default ) 
 #endif
 
 !$acc data copyin  (t,q,qcn,qin,ncn,nin,qrn,qsn,nrn,nsn,qgr,ngr,relvar,frzimm, &
