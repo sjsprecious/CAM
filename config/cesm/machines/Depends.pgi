@@ -6,7 +6,8 @@ micro_mg_data.o \
 micro_mg_utils.o \
 micro_mg_cam.o \
 wv_sat_methods.o \
-shr_spfn_mod.o
+shr_spfn_mod.o \
+cam_comp.o
 
 ifeq ($(DEBUG),FALSE)
   $(PUMAS_MG_OBJS): %.o: %.F90
