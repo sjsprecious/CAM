@@ -93,6 +93,12 @@ subroutine cam_init( &
    use history_defaults, only: initialize_iop_history
 #endif
 
+#if defined(__OPENACC__)
+   use openacc
+   use cam_logfile,      only: iulog
+   use cam_abortutils,   only: endrun
+   use mpishorthand,     only: mpicom
+#endif
 
    ! Arguments
    character(len=cl), intent(in) :: caseid                ! case ID
@@ -134,6 +140,11 @@ subroutine cam_init( &
    ! Local variables
    character(len=cs) :: filein      ! Input namelist filename
    !-----------------------------------------------------------------------
+
+#if defined(__OPENACC__)
+   ! temporary variables for MPI rank and device number information
+   integer  :: rank, ierror, num_dev
+#endif
 
    call init_pio_subsystem()
 
@@ -206,6 +217,22 @@ subroutine cam_init( &
    call intht(model_doi_url)
 
    call cam_snapshot_deactivate()
+
+#if defined(__OPENACC__)
+   ! get current MPI rank
+   call mpi_comm_rank (mpicom, rank, ierror)
+   if (ierror /= 0) then
+      call endrun("Fail to get the MPI rank info inside the cam_init subroutine!")
+   end if
+   ! get available GPU device number 
+   num_dev = acc_get_num_devices( acc_device_default )
+   if (num_dev == 0) then
+      call endrun("Fail to find GPU on this node!")
+   end if
+   write(iulog, *) "MPI rank = ", rank, ", Number of GPU = ", num_dev
+   ! choose different GPUs for different MPI ranks
+   call acc_set_device_num( mod(rank, num_dev), acc_device_default )
+#endif
 
 end subroutine cam_init
 
