@@ -504,13 +504,6 @@ subroutine micro_mg_tend ( &
        graupel_rime_splintering, &
        evaporate_sublimate_precip_graupel
 
-#if defined(__OPENACC__)
-  use openacc
-  use cam_logfile,    only: iulog
-  use cam_abortutils, only: endrun
-  use mpishorthand,  only : mpicom
-#endif
-
   !Authors: Hugh Morrison, Andrew Gettelman, NCAR, Peter Caldwell, LLNL
   ! e-mail: morrison@ucar.edu, andrew@ucar.edu
 
@@ -945,11 +938,6 @@ subroutine micro_mg_tend ( &
   real(r8) :: irad
   real(r8) :: ifrac
 
-#if defined(__OPENACC__)
-  ! temporary variables for MPI rank and device number information
-  integer  :: rank, ierror, num_dev
-#endif
-
   !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
 !$acc declare copyin (nccons,nicons,ngcons,ncnst,ninst,ngnst,dcs,g,r,rv,cpp,   &
@@ -994,22 +982,6 @@ subroutine micro_mg_tend ( &
 
   mdust = size(rndst,3)
 
-#if defined(__OPENACC__)
-  ! get current MPI rank
-  call mpi_comm_rank (mpicom, rank, ierror)
-  if (ierror /= 0) then
-     call endrun("Fail to get the MPI rank info inside the MG3 subroutine!")
-  end if
-  ! get available GPU device number 
-!  num_dev = acc_get_num_devices( acc_device_default )
-!  if (num_dev == 0) then
-!     call endrun("Fail to find GPU on this node!")
-!  end if
-!  write(iulog, *) "Number of GPU = ", num_dev
-  ! choose different GPUs for different MPI ranks
-!  call acc_set_device_num( mod(rank, num_dev), acc_device_default ) 
-#endif
-
 !$acc data copyin  (t,q,qcn,qin,ncn,nin,qrn,qsn,nrn,nsn,qgr,ngr,relvar,frzimm, &
 !$acc               accre_enhan,p,pdel,cldn,liqcldf,icecldf,qsatfac,frzcnt,    &
 !$acc               naai,npccn,rndst,nacon,tnd_qsnow,tnd_nsnow,re_ice,frzdep,  &
@@ -1047,7 +1019,7 @@ subroutine micro_mg_tend ( &
 !$acc               prds,psacr,ncic,niic,nsic,nric,qiic,qsic,qric,dumi,dumni,  &
 !$acc               dumr,dumnr,dums,dumns,qtmpAI,qvnAI,dumc,dumnc,qcic)
 
-  call t_startf ('micro_mg3_init')
+  !!call t_startf ('micro_mg3_init')
 
   ! Copies of input concentrations that may be changed internally.
   !$acc parallel vector_length(VLEN) default(present)
@@ -1151,19 +1123,19 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  call t_stopf ('micro_mg3_init')
+  !!call t_stopf ('micro_mg3_init')
 
   !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
   ! Get humidity and saturation vapor pressures
 
-  call t_startf ('micro_mg3_qsat')
+  !!call t_startf ('micro_mg3_qsat')
 
   call qsat_water(t, p, esl, qvl, mgncol*nlev)
   call qsat_ice(t, p, esi, qvi, mgncol*nlev)
 
-  call t_stopf ('micro_mg3_qsat')
+  !!call t_stopf ('micro_mg3_qsat')
 
-  call t_startf ('micro_mg3_init')
+  !!call t_startf ('micro_mg3_init')
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2)
@@ -1407,7 +1379,7 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  call t_stopf ('micro_mg3_init')
+  !!call t_stopf ('micro_mg3_init')
 
   !ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
   ! droplet activation
@@ -1421,7 +1393,7 @@ subroutine micro_mg_tend ( &
   ! output activated liquid and ice (convert from #/kg -> #/m3)
   !--------------------------------------------------
 
-  call t_startf ('micro_mg3_misc')
+  !!call t_startf ('micro_mg3_misc')
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2)
@@ -1694,7 +1666,7 @@ subroutine micro_mg_tend ( &
 
   endif
 
-  call t_stopf ('micro_mg3_misc')
+  !!call t_stopf ('micro_mg3_misc')
 
   !ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
   ! get size distribution parameters based on in-cloud cloud water
@@ -1704,11 +1676,11 @@ subroutine micro_mg_tend ( &
   ! cloud liquid
   !-------------------------------------------
 
-  call t_startf ('micro_mg3_size_dist_param_liq_vect')
+  !!call t_startf ('micro_mg3_size_dist_param_liq_vect')
 
   call size_dist_param_liq_vect(mg_liq_props, qcic, ncic, rho, pgam, lamc, mgncol*nlev)
 
-  call t_stopf ('micro_mg3_size_dist_param_liq_vect')
+  !!call t_stopf ('micro_mg3_size_dist_param_liq_vect')
 
   !========================================================================
   ! autoconversion of cloud liquid water to rain
@@ -1716,14 +1688,14 @@ subroutine micro_mg_tend ( &
   ! minimum qc of 1 x 10^-8 prevents floating point error
 
   if (.not. do_sb_physics) then
-    call t_startf ('micro_mg3_kk2000_liq_autoconversion')
+    !!call t_startf ('micro_mg3_kk2000_liq_autoconversion')
 
     call kk2000_liq_autoconversion(microp_uniform, qcic, ncic, rho, relvar, prc, nprc, nprc1, mgncol*nlev)
 
-    call t_stopf ('micro_mg3_kk2000_liq_autoconversion')
+    !!call t_stopf ('micro_mg3_kk2000_liq_autoconversion')
   endif
 
-  call t_startf ('micro_mg3_misc')
+  !!call t_startf ('micro_mg3_misc')
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2)
@@ -1751,22 +1723,22 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  call t_stopf ('micro_mg3_misc')
+  !!call t_stopf ('micro_mg3_misc')
 
-  call t_startf ('micro_mg3_size_dist_param_basic_vect')
+  !!call t_startf ('micro_mg3_size_dist_param_basic_vect')
 
   ! Get size distribution parameters for cloud ice
   call size_dist_param_basic_vect(mg_ice_props, qiic, niic, lami, mgncol*nlev, n0=n0i)
 
-  call t_stopf ('micro_mg3_size_dist_param_basic_vect')
+  !!call t_stopf ('micro_mg3_size_dist_param_basic_vect')
 
   ! Alternative autoconversion 
   if (do_sb_physics) then
-     call t_startf ('micro_mg3_sb2001v2_liq_autoconversion')
+     !!call t_startf ('micro_mg3_sb2001v2_liq_autoconversion')
 
      call sb2001v2_liq_autoconversion(pgam, qcic, ncic, qric, rho, relvar, prc, nprc, nprc1, mgncol*nlev) 
 
-     call t_stopf ('micro_mg3_sb2001v2_liq_autoconversion')
+     !!call t_stopf ('micro_mg3_sb2001v2_liq_autoconversion')
   end if
 
   !.......................................................................
@@ -1774,16 +1746,16 @@ subroutine micro_mg_tend ( &
   ! similar to Ferrier (1994)
 
   if (do_cldice) then
-     call t_startf ('micro_mg3_ice_autoconversion')
+     !!call t_startf ('micro_mg3_ice_autoconversion')
 
      call ice_autoconversion(t, qiic, lami, n0i, dcs, prci, nprci, mgncol*nlev)
 
-     call t_stopf ('micro_mg3_ice_autoconversion')
+     !!call t_stopf ('micro_mg3_ice_autoconversion')
   else
      ! Add in the particles that we have already converted to snow, and
      ! don't do any further autoconversion of ice.
 
-     call t_startf ('micro_mg3_misc')
+     !!call t_startf ('micro_mg3_misc')
 
      !$acc parallel vector_length(VLEN) default(present)
      !$acc loop gang vector collapse(2)
@@ -1795,14 +1767,14 @@ subroutine micro_mg_tend ( &
      end do
      !$acc end parallel
 
-     call t_stopf ('micro_mg3_misc')
+     !!call t_stopf ('micro_mg3_misc')
   end if
 
   ! note, currently we don't have this
   ! inside the do_cldice block, should be changed later
   ! assign qsic based on prognostic qs, using assumed precip fraction
 
-   call t_startf ('micro_mg3_misc')
+   !!call t_startf ('micro_mg3_misc')
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2)
@@ -1844,20 +1816,20 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  call t_stopf ('micro_mg3_misc')
+  !!call t_stopf ('micro_mg3_misc')
 
   !.......................................................................
   ! get size distribution parameters for precip
   !......................................................................
   ! rain
 
-  call t_startf ('micro_mg3_size_dist_param_basic_vect')
+  !!call t_startf ('micro_mg3_size_dist_param_basic_vect')
 
   call size_dist_param_basic_vect(mg_rain_props, qric, nric, lamr, mgncol*nlev, n0=n0r)
 
-  call t_stopf ('micro_mg3_size_dist_param_basic_vect')
+  !!call t_stopf ('micro_mg3_size_dist_param_basic_vect')
 
-  call t_startf ('micro_mg3_misc')
+  !!call t_startf ('micro_mg3_misc')
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2)
@@ -1876,18 +1848,18 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  call t_stopf ('micro_mg3_misc')
+  !!call t_stopf ('micro_mg3_misc')
 
   !......................................................................
   ! snow
 
-  call t_startf ('micro_mg3_size_dist_param_basic_vect')
+  !!call t_startf ('micro_mg3_size_dist_param_basic_vect')
 
   call size_dist_param_basic_vect(mg_snow_props, qsic, nsic, lams, mgncol*nlev, n0=n0s)
 
-  call t_stopf ('micro_mg3_size_dist_param_basic_vect')
+  !!call t_stopf ('micro_mg3_size_dist_param_basic_vect')
 
-  call t_startf ('micro_mg3_misc')
+  !!call t_startf ('micro_mg3_misc')
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2)
@@ -1906,7 +1878,7 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  call t_stopf ('micro_mg3_misc')
+  !!call t_stopf ('micro_mg3_misc')
 
 !  !......................................................................
 !  !       graupel/hail density set (Hail = 400, Graupel = 500 from M2005)
@@ -1922,7 +1894,7 @@ subroutine micro_mg_tend ( &
 
   !  graupel/hail size distributions and properties
 
-  call t_startf ('micro_mg3_size_dist_param_basic_vect')
+  !!call t_startf ('micro_mg3_size_dist_param_basic_vect')
 
   if (do_hail) then
      call size_dist_param_basic_vect(mg_hail_props, qgic, ngic, lamg, mgncol*nlev, n0=n0g)
@@ -1931,9 +1903,9 @@ subroutine micro_mg_tend ( &
      call size_dist_param_basic_vect(mg_graupel_props, qgic, ngic, lamg, mgncol*nlev, n0=n0g)
   end if
 
-  call t_stopf ('micro_mg3_size_dist_param_basic_vect')
+  !!call t_stopf ('micro_mg3_size_dist_param_basic_vect')
 
-  call t_startf ('micro_mg3_misc')
+  !!call t_startf ('micro_mg3_misc')
         
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2)
@@ -1954,22 +1926,22 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  call t_stopf ('micro_mg3_misc')
+  !!call t_stopf ('micro_mg3_misc')
 
   if (do_cldice) then
      if (.not. use_hetfrz_classnuc) then
         ! heterogeneous freezing of cloud water
         !----------------------------------------------
-        call t_startf ('micro_mg3_immersion_freezing')
+        !!call t_startf ('micro_mg3_immersion_freezing')
 
         call immersion_freezing(microp_uniform, t, pgam, lamc, qcic, ncic, relvar, mnuccc, nnuccc, mgncol*nlev)
 
-        call t_stopf ('micro_mg3_immersion_freezing')
+        !!call t_stopf ('micro_mg3_immersion_freezing')
 
         ! make sure number of droplets frozen does not exceed available ice nuclei concentration
         ! this prevents 'runaway' droplet freezing
 
-        call t_startf ('micro_mg3_misc')
+        !!call t_startf ('micro_mg3_misc')
 
         !$acc parallel vector_length(VLEN) default(present)
         !$acc loop gang vector collapse(2)
@@ -1987,20 +1959,20 @@ subroutine micro_mg_tend ( &
         end do
         !$acc end parallel
 
-        call t_stopf ('micro_mg3_misc')
+        !!call t_stopf ('micro_mg3_misc')
 
-        call t_startf ('micro_mg3_contact_freezing')
+        !!call t_startf ('micro_mg3_contact_freezing')
 
         call contact_freezing(microp_uniform, t, p, rndst, nacon, pgam, lamc, qcic, ncic, &
                               relvar, mnucct, nnucct, mgncol*nlev, mdust)
 
-        call t_stopf ('micro_mg3_contact_freezing')
+        !!call t_stopf ('micro_mg3_contact_freezing')
      else
         ! Mass of droplets frozen is the average droplet mass, except
         ! with two limiters: concentration must be at least 1/cm^3, and
         ! mass must be at least the minimum defined above.
 
-        call t_startf ('micro_mg3_misc')
+        !!call t_startf ('micro_mg3_misc')
 
         !$acc parallel vector_length(VLEN) default(present)
         !$acc loop gang vector collapse(2)
@@ -2031,11 +2003,11 @@ subroutine micro_mg_tend ( &
         end do
         !$acc end parallel
 
-        call t_stopf ('micro_mg3_misc')
+        !!call t_stopf ('micro_mg3_misc')
 
      end if
   else
-     call t_startf ('micro_mg3_misc')
+     !!call t_startf ('micro_mg3_misc')
 
      !$acc parallel vector_length(VLEN) default(present)
      !$acc loop gang vector collapse(2)
@@ -2051,30 +2023,30 @@ subroutine micro_mg_tend ( &
      end do
      !$acc end parallel
 
-     call t_stopf ('micro_mg3_misc')
+     !!call t_stopf ('micro_mg3_misc')
   end if
 
-  call t_startf ('micro_mg3_snow_self_aggregation')
+  !!call t_startf ('micro_mg3_snow_self_aggregation')
 
   call snow_self_aggregation(t, rho, asn, rhosn, qsic, nsic, nsagg, mgncol*nlev)
 
-  call t_stopf ('micro_mg3_snow_self_aggregation')
+  !!call t_stopf ('micro_mg3_snow_self_aggregation')
 
-  call t_startf ('micro_mg3_accrete_cloud_water_snow')
+  !!call t_startf ('micro_mg3_accrete_cloud_water_snow')
 
   call accrete_cloud_water_snow(t, rho, asn, uns, mu, qcic, ncic, qsic, pgam, &
                                 lamc, lams, n0s, psacws, npsacws, mgncol*nlev)
 
-  call t_stopf ('micro_mg3_accrete_cloud_water_snow')
+  !!call t_stopf ('micro_mg3_accrete_cloud_water_snow')
 
   if (do_cldice) then
-     call t_startf ('micro_mg3_secondary_ice_production')
+     !!call t_startf ('micro_mg3_secondary_ice_production')
 
      call secondary_ice_production(t, psacws, msacwi, nsacwi, mgncol*nlev)
 
-     call t_stopf ('micro_mg3_secondary_ice_production')
+     !!call t_stopf ('micro_mg3_secondary_ice_production')
   else
-     call t_startf ('micro_mg3_misc')
+     !!call t_startf ('micro_mg3_misc')
 
      !$acc parallel vector_length(VLEN) default(present)
      !$acc loop gang vector collapse(2)
@@ -2086,50 +2058,50 @@ subroutine micro_mg_tend ( &
      end do
      !$acc end parallel
 
-     call t_stopf ('micro_mg3_misc')
+     !!call t_stopf ('micro_mg3_misc')
   end if
 
-  call t_startf ('micro_mg3_accrete_rain_snow')
+  !!call t_startf ('micro_mg3_accrete_rain_snow')
 
   call accrete_rain_snow(t, rho, umr, ums, unr, uns, qric, qsic, lamr, &
                          n0r, lams, n0s, pracs, npracs, mgncol*nlev)
 
-  call t_stopf ('micro_mg3_accrete_rain_snow')
+  !!call t_stopf ('micro_mg3_accrete_rain_snow')
 
-  call t_startf ('micro_mg3_heterogeneous_rain_freezing')
+  !!call t_startf ('micro_mg3_heterogeneous_rain_freezing')
 
   call heterogeneous_rain_freezing(t, qric, nric, lamr, mnuccr, nnuccr, mgncol*nlev)
 
-  call t_stopf ('micro_mg3_heterogeneous_rain_freezing')
+  !!call t_stopf ('micro_mg3_heterogeneous_rain_freezing')
 
   if (do_sb_physics) then
-     call t_startf ('micro_mg3_sb2001v2_accre_cld_water_rain')
+     !!call t_startf ('micro_mg3_sb2001v2_accre_cld_water_rain')
 
      call sb2001v2_accre_cld_water_rain(qcic, ncic, qric, rho, relvar, pra, npra, mgncol*nlev)     
 
-     call t_stopf ('micro_mg3_sb2001v2_accre_cld_water_rain')
+     !!call t_stopf ('micro_mg3_sb2001v2_accre_cld_water_rain')
   else
-     call t_startf ('micro_mg3_accrete_cloud_water_rain')
+     !!call t_startf ('micro_mg3_accrete_cloud_water_rain')
 
      call accrete_cloud_water_rain(microp_uniform, qric, qcic, ncic, relvar, accre_enhan, pra, npra, mgncol*nlev)
 
-     call t_stopf ('micro_mg3_accrete_cloud_water_rain')
+     !!call t_stopf ('micro_mg3_accrete_cloud_water_rain')
   endif
 
-  call t_startf ('micro_mg3_self_collection_rain')
+  !!call t_startf ('micro_mg3_self_collection_rain')
 
   call self_collection_rain(rho, qric, nric, nragg, mgncol*nlev)
 
-  call t_stopf ('micro_mg3_self_collection_rain')
+  !!call t_stopf ('micro_mg3_self_collection_rain')
 
   if (do_cldice) then
-     call t_startf ('micro_mg3_accrete_cloud_ice_snow')
+     !!call t_startf ('micro_mg3_accrete_cloud_ice_snow')
 
      call accrete_cloud_ice_snow(t, rho, asn, qiic, niic, qsic, lams, n0s, prai, nprai, mgncol*nlev)
 
-     call t_stopf ('micro_mg3_accrete_cloud_ice_snow')
+     !!call t_stopf ('micro_mg3_accrete_cloud_ice_snow')
   else
-     call t_startf ('micro_mg3_misc')
+     !!call t_startf ('micro_mg3_misc')
 
      !$acc parallel vector_length(VLEN) default(present)
      !$acc loop gang vector collapse(2)
@@ -2141,16 +2113,16 @@ subroutine micro_mg_tend ( &
      end do
      !$acc end parallel
 
-     call t_stopf ('micro_mg3_misc')
+     !!call t_stopf ('micro_mg3_misc')
   end if
 
-  call t_startf ('micro_mg3_bergeron_process_snow')
+  !!call t_startf ('micro_mg3_bergeron_process_snow')
 
   call bergeron_process_snow(t, rho, dv, mu, sc, qvl, qvi, asn, qcic, qsic, lams, n0s, bergs, mgncol*nlev)
 
-  call t_stopf ('micro_mg3_bergeron_process_snow')
+  !!call t_stopf ('micro_mg3_bergeron_process_snow')
 
-  call t_startf ('micro_mg3_misc')
+  !!call t_startf ('micro_mg3_misc')
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2)
@@ -2161,18 +2133,18 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  call t_stopf ('micro_mg3_misc')
+  !!call t_stopf ('micro_mg3_misc')
 
   if (do_cldice) then
-     call t_startf ('micro_mg3_ice_deposition_sublimation')
+     !!call t_startf ('micro_mg3_ice_deposition_sublimation')
 
      call ice_deposition_sublimation(t, q, qi, ni, &
           icldm, rho, dv, qvl, qvi, &
           berg, vap_dep, ice_sublim, mgncol*nlev)
 
-     call t_stopf ('micro_mg3_ice_deposition_sublimation')
+     !!call t_stopf ('micro_mg3_ice_deposition_sublimation')
 
-     call t_startf ('micro_mg3_misc')
+     !!call t_startf ('micro_mg3_misc')
 
      !$acc parallel vector_length(VLEN) default(present)
      !$acc loop gang vector collapse(2)
@@ -2195,7 +2167,7 @@ subroutine micro_mg_tend ( &
      end do
      !$acc end parallel
 
-     call t_stopf ('micro_mg3_misc')
+     !!call t_stopf ('micro_mg3_misc')
   end if !do_cldice
 
 ! Process rate calls for graupel   
@@ -2203,7 +2175,7 @@ subroutine micro_mg_tend ( &
 
   if (do_hail.or.do_graupel) then
 
-     call t_startf ('micro_mg3_evap_graupel')
+     !!call t_startf ('micro_mg3_evap_graupel')
 
      call graupel_collecting_snow(qsic, qric, umr, ums, rho, lamr, n0r, lams, n0s, psacr, mgncol*nlev)
 
@@ -2228,21 +2200,21 @@ subroutine micro_mg_tend ( &
                                              bgtmp, qcic, qiic, qric, qsic, qgic, lamr, n0r, lams, n0s, lamg, n0g, &
                                              pre, prds, prdg, am_evp_st, mgncol*nlev) 
 
-     call t_stopf ('micro_mg3_evap_graupel')
+     !!call t_stopf ('micro_mg3_evap_graupel')
 
   else
 
-     call t_startf ('micro_mg3_evap_no_graupel')
+     !!call t_startf ('micro_mg3_evap_no_graupel')
 
      ! Routine without Graupel (original)        
      call evaporate_sublimate_precip(t, rho, dv, mu, sc, q, qvl, qvi, lcldm, precip_frac, arn, asn, qcic, qiic, &
                                      qric, qsic, lamr, n0r, lams, n0s, pre, prds, am_evp_st, mgncol*nlev)
 
-     call t_stopf ('micro_mg3_evap_no_graupel')
+     !!call t_stopf ('micro_mg3_evap_no_graupel')
 
   end if ! end do_graupel/hail loop
 
-  call t_startf ('micro_mg3_misc')
+  !!call t_startf ('micro_mg3_misc')
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2) private(dum,ratio)
@@ -2580,16 +2552,16 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  call t_stopf ('micro_mg3_misc')
+  !!call t_stopf ('micro_mg3_misc')
 
-  call t_startf ('micro_mg3_qsat')
+  !!call t_startf ('micro_mg3_qsat')
 
   ! use rhw to allow ice supersaturation
   call qsat_water(ttmpA, p, esnA, qvnAI, mgncol*nlev)
 
-  call t_stopf ('micro_mg3_qsat')
+  !!call t_stopf ('micro_mg3_qsat')
 
-  call t_startf ('micro_mg3_misc')
+  !!call t_startf ('micro_mg3_misc')
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2)
@@ -2610,16 +2582,16 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  call t_stopf ('micro_mg3_misc')
+  !!call t_stopf ('micro_mg3_misc')
 
-  call t_startf ('micro_mg3_qsat')
+  !!call t_startf ('micro_mg3_qsat')
 
   ! use rhw to allow ice supersaturation
   call qsat_water(ttmpA, p, esnA, qvnA, mgncol*nlev)
 
-  call t_stopf ('micro_mg3_qsat')
+  !!call t_stopf ('micro_mg3_qsat')
 
-  call t_startf ('micro_mg3_misc')
+  !!call t_startf ('micro_mg3_misc')
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2) private(dum)
@@ -2638,16 +2610,16 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  call t_stopf ('micro_mg3_misc')
+  !!call t_stopf ('micro_mg3_misc')
 
-  call t_startf ('micro_mg3_qsat')
+  !!call t_startf ('micro_mg3_qsat')
 
   ! do separately using RHI for prds and ice_sublim
   call qsat_ice(ttmpA, p, esnA, qvnA, mgncol*nlev)
 
-  call t_stopf ('micro_mg3_qsat')
+  !!call t_stopf ('micro_mg3_qsat')
 
-  call t_startf ('micro_mg3_misc')
+  !!call t_startf ('micro_mg3_misc')
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2) private(dum)
@@ -2904,24 +2876,24 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  call t_stopf ('micro_mg3_misc')
+  !!call t_stopf ('micro_mg3_misc')
 
-  call t_startf ('micro_mg3_size_dist_param_basic_vect')
+  !!call t_startf ('micro_mg3_size_dist_param_basic_vect')
 
   ! calculate n0r and lamr from rain mass and number
   ! divide by precip fraction to get in-precip (local) values of
   ! rain mass and number, divide by rhow to get rain number in kg^-1
   call size_dist_param_basic_vect(mg_rain_props, qric, nric, lamr, mgncol*nlev, n0=n0r)
 
-  call t_stopf ('micro_mg3_size_dist_param_basic_vect')
+  !!call t_stopf ('micro_mg3_size_dist_param_basic_vect')
 
-  call t_startf ('micro_mg3_calc_rercld')
+  !!call t_startf ('micro_mg3_calc_rercld')
 
   ! Calculate rercld
   ! calculate mean size of combined rain and cloud water
   call calc_rercld(lamr, n0r, lamc, pgam, qric, qcic, ncic, rercld, mgncol*nlev)
 
-  call t_stopf ('micro_mg3_calc_rercld')
+  !!call t_stopf ('micro_mg3_calc_rercld')
 
   ! Assign variables back to start-of-timestep values
   ! Some state variables are changed before the main microphysics loop
@@ -2935,7 +2907,7 @@ subroutine micro_mg_tend ( &
 
   ! Re-apply droplet activation tendency
 
-  call t_startf ('micro_mg3_misc')
+  !!call t_startf ('micro_mg3_misc')
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2)
@@ -3026,22 +2998,22 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  call t_stopf ('micro_mg3_misc')
+  !!call t_stopf ('micro_mg3_misc')
 
   ! obtain new slope parameter to avoid possible singularity
-  call t_startf ('micro_mg3_size_dist_param_basic_vect')
+  !!call t_startf ('micro_mg3_size_dist_param_basic_vect')
 
   call size_dist_param_basic_vect(mg_ice_props, dumi, dumni, lami, mgncol*nlev)
 
-  call t_stopf ('micro_mg3_size_dist_param_basic_vect')
+  !!call t_stopf ('micro_mg3_size_dist_param_basic_vect')
 
-  call t_startf ('micro_mg3_size_dist_param_liq_vect')
+  !!call t_startf ('micro_mg3_size_dist_param_liq_vect')
 
   call size_dist_param_liq_vect(mg_liq_props, dumc, dumnc, rho, pgam, lamc, mgncol*nlev)
 
-  call t_stopf ('micro_mg3_size_dist_param_liq_vect')
+  !!call t_stopf ('micro_mg3_size_dist_param_liq_vect')
 
-  call t_startf ('micro_mg3_misc')
+  !!call t_startf ('micro_mg3_misc')
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2) private(dum1,dum2,dum3,dum4)
@@ -3113,9 +3085,9 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  call t_stopf ('micro_mg3_misc')
+  !!call t_stopf ('micro_mg3_misc')
 
-  call t_startf ('micro_mg3_size_dist_param_basic_vect')
+  !!call t_startf ('micro_mg3_size_dist_param_basic_vect')
 
   ! fallspeed for rain
   call size_dist_param_basic_vect(mg_rain_props, dumr, dumnr, lamr, mgncol*nlev)
@@ -3129,9 +3101,9 @@ subroutine micro_mg_tend ( &
      call size_dist_param_basic_vect(mg_graupel_props, dumg, dumng, lamg, mgncol*nlev)
   end if
 
-  call t_stopf ('micro_mg3_size_dist_param_basic_vect')
+  !!call t_stopf ('micro_mg3_size_dist_param_basic_vect')
 
-  call t_startf ('micro_mg3_misc')
+  !!call t_startf ('micro_mg3_misc')
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2)
@@ -3209,42 +3181,42 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  call t_stopf ('micro_mg3_misc')
+  !!call t_stopf ('micro_mg3_misc')
 
   ! begin sedimentation
 
-  call t_startf ('micro_mg3_sedimentation_ice')
+  !!call t_startf ('micro_mg3_sedimentation_ice')
   ! ice
   call Sedimentation(mgncol,nlev,do_cldice,deltat,fi,fni,pdel_inv, &
                      qitend,nitend,qisedten,dumi,dumni,prect,iflx, &
                      xxlx=xxls,qxsevap=qisevap,tlat=tlat,qvlat=qvlat, &
                      xcldm=icldm,preci=preci)
-  call t_stopf ('micro_mg3_sedimentation_ice')
+  !!call t_stopf ('micro_mg3_sedimentation_ice')
 
-  call t_startf ('micro_mg3_sedimentation_liq')
+  !!call t_startf ('micro_mg3_sedimentation_liq')
   ! liq
   call Sedimentation(mgncol,nlev,.TRUE.,deltat,fc,fnc,pdel_inv, &
                      qctend,nctend,qcsedten,dumc,dumnc,prect,lflx, &
                      xxlx=xxlv,qxsevap=qcsevap,tlat=tlat,qvlat=qvlat,xcldm=lcldm)
-  call t_stopf ('micro_mg3_sedimentation_liq')
+  !!call t_stopf ('micro_mg3_sedimentation_liq')
 
-  call t_startf ('micro_mg3_sedimentation_rain')
+  !!call t_startf ('micro_mg3_sedimentation_rain')
   ! rain
   call Sedimentation(mgncol,nlev,.TRUE.,deltat,fr,fnr,pdel_inv, &
                      qrtend,nrtend,qrsedten,dumr,dumnr,prect,rflx)
-  call t_stopf ('micro_mg3_sedimentation_rain')
+  !!call t_stopf ('micro_mg3_sedimentation_rain')
 
-  call t_startf ('micro_mg3_sedimentation_snow')
+  !!call t_startf ('micro_mg3_sedimentation_snow')
   ! snow
   call Sedimentation(mgncol,nlev,.TRUE.,deltat,fs,fns,pdel_inv, &
                      qstend,nstend,qssedten,dums,dumns,prect,sflx,preci=preci)
-  call t_stopf ('micro_mg3_sedimentation_snow')
+  !!call t_stopf ('micro_mg3_sedimentation_snow')
 
-  call t_startf ('micro_mg3_sedimentation_graupel')
+  !!call t_startf ('micro_mg3_sedimentation_graupel')
   ! graupel
   call Sedimentation(mgncol,nlev,.TRUE.,deltat,fg,fng,pdel_inv, &
                      qgtend,ngtend,qgsedten,dumg,dumng,prect,gflx,preci=preci)
-  call t_stopf ('micro_mg3_sedimentation_graupel')
+  !!call t_stopf ('micro_mg3_sedimentation_graupel')
 
   ! end sedimentation
 
@@ -3253,7 +3225,7 @@ subroutine micro_mg_tend ( &
   ! get new update for variables that includes sedimentation tendency
   ! note : here dum variables are grid-average, NOT in-cloud
 
-  call t_startf ('micro_mg3_misc')
+  !!call t_startf ('micro_mg3_misc')
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2)
@@ -3364,18 +3336,18 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  call t_stopf ('micro_mg3_misc')
+  !!call t_stopf ('micro_mg3_misc')
 
-  call t_startf ('micro_mg3_size_dist_param_basic_vect')
+  !!call t_startf ('micro_mg3_size_dist_param_basic_vect')
 
   ! get mean size of rain = 1/lamr, add frozen rain to either snow or cloud ice
   ! depending on mean rain size
   ! add to graupel if using that option....
   call size_dist_param_basic_vect(mg_rain_props, dumr, dumnr, lamr, mgncol*nlev)
 
-  call t_stopf ('micro_mg3_size_dist_param_basic_vect')
+  !!call t_stopf ('micro_mg3_size_dist_param_basic_vect')
 
-  call t_startf ('micro_mg3_misc')
+  !!call t_startf ('micro_mg3_misc')
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2) private(dum,dum1)
@@ -3428,11 +3400,11 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  call t_stopf ('micro_mg3_misc')
+  !!call t_stopf ('micro_mg3_misc')
 
   if (do_cldice) then
 
-     call t_startf ('micro_mg3_misc')
+     !!call t_startf ('micro_mg3_misc')
 
      !$acc parallel vector_length(VLEN) default(present)
      !$acc loop gang vector collapse(2) private(dum)
@@ -3525,16 +3497,16 @@ subroutine micro_mg_tend ( &
      end do
      !$acc end parallel
 
-     call t_stopf ('micro_mg3_misc')
+     !!call t_stopf ('micro_mg3_misc')
 
-     call t_startf ('micro_mg3_qsat')
+     !!call t_startf ('micro_mg3_qsat')
 
      ! use rhw to allow ice supersaturation
      call qsat_water(ttmpA, p, esnA, qvnA, mgncol*nlev)
 
-     call t_stopf ('micro_mg3_qsat')
+     !!call t_stopf ('micro_mg3_qsat')
 
-     call t_startf ('micro_mg3_misc')
+     !!call t_startf ('micro_mg3_misc')
 
      !$acc parallel vector_length(VLEN) default(present)
      !$acc loop gang vector collapse(2) private(dum,dum1)
@@ -3572,7 +3544,7 @@ subroutine micro_mg_tend ( &
      end do 
      !$acc end parallel
 
-     call t_stopf ('micro_mg3_misc')
+     !!call t_stopf ('micro_mg3_misc')
 
   end if
 
@@ -3584,7 +3556,7 @@ subroutine micro_mg_tend ( &
   ! update cloud variables after instantaneous processes to get effective radius
   ! variables are in-cloud to calculate size dist parameters
 
-  call t_startf ('micro_mg3_misc')
+  !!call t_startf ('micro_mg3_misc')
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2)
@@ -3628,14 +3600,14 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  call t_stopf ('micro_mg3_misc')
+  !!call t_stopf ('micro_mg3_misc')
 
   ! cloud ice effective radius
   !-----------------------------------------------------------------
 
   if (do_cldice) then
 
-     call t_startf ('micro_mg3_misc')
+     !!call t_startf ('micro_mg3_misc')
 
      !$acc parallel vector_length(VLEN) default(present)
      !$acc loop gang vector collapse(2)
@@ -3646,15 +3618,15 @@ subroutine micro_mg_tend ( &
      end do
      !$acc end parallel
 
-     call t_stopf ('micro_mg3_misc')
+     !!call t_stopf ('micro_mg3_misc')
 
-     call t_startf ('micro_mg3_size_dist_param_basic_vect')
+     !!call t_startf ('micro_mg3_size_dist_param_basic_vect')
 
      call size_dist_param_basic_vect(mg_ice_props, dumi, dumni, lami, mgncol*nlev, n0=dumni0A2D)
 
-     call t_stopf ('micro_mg3_size_dist_param_basic_vect')
+     !!call t_stopf ('micro_mg3_size_dist_param_basic_vect')
 
-     call t_startf ('micro_mg3_misc')
+     !!call t_startf ('micro_mg3_misc')
 
      !$acc parallel vector_length(VLEN) default(present)
      !$acc loop gang vector collapse(2)
@@ -3678,9 +3650,9 @@ subroutine micro_mg_tend ( &
      end do
      !$acc end parallel
 
-     call t_stopf ('micro_mg3_misc')
+     !!call t_stopf ('micro_mg3_misc')
   else
-     call t_startf ('micro_mg3_misc')
+     !!call t_startf ('micro_mg3_misc')
 
      !$acc parallel vector_length(VLEN) default(present)
      !acc loop gang vector collapse(2)
@@ -3695,10 +3667,10 @@ subroutine micro_mg_tend ( &
      end do
      !$acc end parallel
 
-     call t_stopf ('micro_mg3_misc')
+     !!call t_stopf ('micro_mg3_misc')
   end if
 
-  call t_startf ('micro_mg3_misc')
+  !!call t_startf ('micro_mg3_misc')
 
   ! cloud droplet effective radius
   !-----------------------------------------------------------------
@@ -3711,15 +3683,15 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  call t_stopf ('micro_mg3_misc')
+  !!call t_stopf ('micro_mg3_misc')
 
-  call t_startf ('micro_mg3_size_dist_param_liq_vect')
+  !!call t_startf ('micro_mg3_size_dist_param_liq_vect')
 
   call size_dist_param_liq_vect(mg_liq_props, dumc, dumnc, rho, pgam, lamc, mgncol*nlev)
 
-  call t_stopf ('micro_mg3_size_dist_param_liq_vect')
+  !!call t_stopf ('micro_mg3_size_dist_param_liq_vect')
 
-  call t_startf ('micro_mg3_misc')
+  !!call t_startf ('micro_mg3_misc')
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2)
@@ -3757,17 +3729,17 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  call t_stopf ('micro_mg3_misc')
+  !!call t_stopf ('micro_mg3_misc')
 
-  call t_startf ('micro_mg3_size_dist_param_liq_vect')
+  !!call t_startf ('micro_mg3_size_dist_param_liq_vect')
 
   ! Pass in "false" adjust flag to prevent number from being changed within
   ! size distribution subroutine.
   call size_dist_param_liq_vect(mg_liq_props, dumc, dumnc, rho, pgam, lamc, mgncol*nlev)
 
-  call t_stopf ('micro_mg3_size_dist_param_liq_vect')
+  !!call t_stopf ('micro_mg3_size_dist_param_liq_vect')
 
-  call t_startf ('micro_mg3_misc')
+  !!call t_startf ('micro_mg3_misc')
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2)
@@ -3797,15 +3769,15 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  call t_stopf ('micro_mg3_misc')
+  !!call t_stopf ('micro_mg3_misc')
 
-  call t_startf ('micro_mg3_size_dist_param_basic_vect')
+  !!call t_startf ('micro_mg3_size_dist_param_basic_vect')
 
   call size_dist_param_basic_vect(mg_rain_props, dumr, dumnr, lamr, mgncol*nlev)
 
-  call t_stopf ('micro_mg3_size_dist_param_basic_vect')
+  !!call t_stopf ('micro_mg3_size_dist_param_basic_vect')
 
-  call t_startf ('micro_mg3_misc')
+  !!call t_startf ('micro_mg3_misc')
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2)
@@ -3833,15 +3805,15 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  call t_stopf ('micro_mg3_misc')
+  !!call t_stopf ('micro_mg3_misc')
 
-  call t_startf ('micro_mg3_size_dist_param_basic_vect')
+  !!call t_startf ('micro_mg3_size_dist_param_basic_vect')
 
   call size_dist_param_basic_vect(mg_snow_props, dums, dumns, lams, mgncol*nlev, n0=dumns0A2D)
 
-  call t_stopf ('micro_mg3_size_dist_param_basic_vect')
+  !!call t_stopf ('micro_mg3_size_dist_param_basic_vect')
 
-  call t_startf ('micro_mg3_misc')
+  !!call t_startf ('micro_mg3_misc')
 
   !$acc parallel vector_length(VLEN) default(present) 
   !$acc loop gang vector collapse(2)
@@ -3870,9 +3842,9 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  call t_stopf ('micro_mg3_misc')
+  !!call t_stopf ('micro_mg3_misc')
 
-  call t_startf ('micro_mg3_size_dist_param_basic_vect')
+  !!call t_startf ('micro_mg3_size_dist_param_basic_vect')
 
   if (do_hail) then
      call size_dist_param_basic_vect(mg_hail_props, dumg, dumng, lamg, mgncol*nlev)
@@ -3881,9 +3853,9 @@ subroutine micro_mg_tend ( &
      call size_dist_param_basic_vect(mg_graupel_props, dumg, dumng, lamg, mgncol*nlev)
   end if
 
-  call t_stopf ('micro_mg3_size_dist_param_basic_vect')
+  !!call t_stopf ('micro_mg3_size_dist_param_basic_vect')
 
-  call t_startf ('micro_mg3_misc')
+  !!call t_startf ('micro_mg3_misc')
 
   !$acc parallel vector_length(VLEN) default(present) 
   !$acc loop gang vector collapse(2)
@@ -3943,17 +3915,17 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  call t_stopf ('micro_mg3_misc')
+  !!call t_stopf ('micro_mg3_misc')
 
-  call t_startf ('micro_mg3_avg_diameter_vec')
+  !!call t_startf ('micro_mg3_avg_diameter_vec')
 
   ! The avg_diameter_vec call does the actual calculation; other diameter
   ! outputs are just drout2 times constants.
   call avg_diameter_vec(qrout,nrout,rho,rhow,drout2,mgncol*nlev)
 
-  call t_stopf ('micro_mg3_avg_diameter_vec')
+  !!call t_stopf ('micro_mg3_avg_diameter_vec')
 
-  call t_startf ('micro_mg3_misc')
+  !!call t_startf ('micro_mg3_misc')
 
   !$acc parallel vector_length(VLEN) default(present) 
   !$acc loop gang vector collapse(2)
@@ -3986,17 +3958,17 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  call t_stopf ('micro_mg3_misc')
+  !!call t_stopf ('micro_mg3_misc')
 
-  call t_startf ('micro_mg3_avg_diameter_vec')
+  !!call t_startf ('micro_mg3_avg_diameter_vec')
 
   ! The avg_diameter_vec call does the actual calculation; other diameter
   ! outputs are just dsout2 times constants.
   call avg_diameter_vec(qsout, nsout, rho, rhosn,dsout2,mgncol*nlev)
 
-  call t_stopf ('micro_mg3_avg_diameter_vec')
+  !!call t_stopf ('micro_mg3_avg_diameter_vec')
 
-  call t_startf ('micro_mg3_misc')
+  !!call t_startf ('micro_mg3_misc')
 
   !$acc parallel vector_length(VLEN) default(present) 
   !$acc loop gang vector collapse(2)
@@ -4031,17 +4003,17 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  call t_stopf ('micro_mg3_misc')
+  !!call t_stopf ('micro_mg3_misc')
 
-  call t_startf ('micro_mg3_avg_diameter_vec')
+  !!call t_startf ('micro_mg3_avg_diameter_vec')
 
   ! The avg_diameter_vec call does the actual calculation; other diameter
   ! outputs are just dsout2 times constants.
   call avg_diameter_vec(qgout, ngout, rho, rhogtmp,dgout2,mgncol*nlev)
 
-  call t_stopf ('micro_mg3_avg_diameter_vec')
+  !!call t_stopf ('micro_mg3_avg_diameter_vec')
 
-  call t_startf ('micro_mg3_misc')
+  !!call t_startf ('micro_mg3_misc')
 
   !$acc parallel vector_length(VLEN) default(present) 
   !$acc loop gang vector collapse(2)
@@ -4165,7 +4137,7 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  call t_stopf ('micro_mg3_misc')
+  !!call t_stopf ('micro_mg3_misc')
 
 !$acc end data 
 
