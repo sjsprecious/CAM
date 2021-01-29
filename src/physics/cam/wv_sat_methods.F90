@@ -55,7 +55,7 @@ integer, parameter :: Bolton_idx = 3
 integer, parameter :: initial_default_idx = GoffGratch_idx
 integer :: default_idx = initial_default_idx
 
-!$acc declare copyin(epsilo, tmelt, tboil, default_idx, omeps, h2otrip)
+!$acc declare create (epsilo, tmelt, tboil, default_idx, omeps, h2otrip)
 
 public wv_sat_methods_init
 public wv_sat_get_scheme_idx
@@ -209,6 +209,8 @@ subroutine  wv_sat_svp_to_qsat_vect(es, p, qs, vlen)
   integer :: i
 
   ! If pressure is less than SVP, set qs to maximum of 1.
+
+  !$acc update device (epsilo, omeps)
 
   !$acc data present (es,p,qs)
 
@@ -542,6 +544,8 @@ subroutine GoffGratch_svp_water_vect(t, es, vlen)
   integer :: i
   ! uncertain below -70 C
 
+  !$acc update device (tboil)
+
   !$acc data present (t,es)
 
   !$acc parallel vector_length(VLEN) default(present)
@@ -575,6 +579,8 @@ subroutine GoffGratch_svp_ice_vect(t, es, vlen)
   real(r8), intent(out) :: es(vlen)             ! SVP in Pa
   integer :: i
   ! good down to -100 C
+
+  !$acc update device (h2otrip)
 
   !$acc data present (t,es)
 
@@ -699,6 +705,8 @@ subroutine OldGoffGratch_svp_water_vect(t,es,vlen)
   real(r8), dimension(vlen) :: ps, e1, e2, f1, f2, f3, f4, f5, f
   integer :: i
 
+  !$acc update device (tboil)
+
   !$acc data present (t,es) &
   !$acc      create  (ps,e1,e2,f1,f2,f3,f4,f5,f)
 
@@ -741,6 +749,8 @@ subroutine OldGoffGratch_svp_ice_vect(t,es,vlen)
   
   real(r8), dimension(vlen) :: term1, term2, term3
   integer :: i
+
+  !$acc update device (tmelt)
 
   !$acc data present (t,es) &
   !$acc      create  (term1,term2,term3)
@@ -789,6 +799,8 @@ subroutine Bolton_svp_water_vect(t, es,vlen)
   real(r8), intent(out) :: es(vlen)             ! SVP in Pa
 
   integer :: i
+
+  !$acc update device (tmelt)
 
   !$acc data present (t,es)
 

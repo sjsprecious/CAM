@@ -143,7 +143,8 @@ subroutine cam_init( &
 
 #if defined(__OPENACC__)
    ! temporary variables for MPI rank and device number information
-   integer  :: rank, ierror, num_dev
+   integer  :: rank, ierror, num_dev, dev_id
+   character(len=10) :: rank_char
 #endif
 
    call init_pio_subsystem()
@@ -233,6 +234,23 @@ subroutine cam_init( &
    ! choose different GPUs for different MPI ranks
    call acc_set_device_num( mod(rank, num_dev), acc_device_default )
 #endif
+
+!!!#if defined(__OPENACC__)
+!!!   ! get local MPI rank
+!!!   call getenv("OMPI_COMM_WORLD_LOCAL_RANK", rank_char)
+!!!   ! get available GPU device number 
+!!!   num_dev = acc_get_num_devices( acc_device_default )
+!!!   if (num_dev == 0) then
+!!!      call endrun("Fail to find GPU on this node!")
+!!!   end if
+!!!   ! choose different GPUs for different MPI ranks
+!!!   read(rank_char,'(i)') rank
+!!!   dev_id = mod(rank, num_dev)
+!!!   !$acc set device_num ( dev_id )
+!!!   !$acc init device_num ( dev_id ) device_type ( acc_device_default )
+!!!   write(iulog, *) "MPI rank = ", rank, ", Number of GPU = ", num_dev, &
+!!!                   ", work on GPU ", dev_id
+!!!#endif
 
 end subroutine cam_init
 
