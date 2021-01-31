@@ -253,11 +253,15 @@ real(r8) :: gamma_half_br_plus5
 real(r8) :: gamma_half_bs_plus5
 real(r8) :: gamma_2bs_plus2
 
-!$acc declare create (rv,cpp,mmult, &
-!$acc                 pi,qsmall,rhoi,rhow,rhog,bs,br,mi0,mg0, &
-!$acc                 limiter_off,icsmall,f1s,f2s,f1r,f2r,eii,ecid,ecr, &
-!$acc                 aimm,bimm,droplet_mass_25um,droplet_mass_40um,tmelt,xxlv,xxls, &
-!$acc                 gamma_bs_plus3,gamma_half_br_plus5,gamma_half_bs_plus5,gamma_2bs_plus2)
+!$acc declare create (rv,cpp,tmelt,xxlv,xxls, &
+!$acc                 gamma_bs_plus3,gamma_half_br_plus5, &
+!$acc                 gamma_half_bs_plus5,gamma_2bs_plus2)
+
+!!!!$acc declare create (rv,cpp,mmult, &
+!!!!$acc                 pi,qsmall,rhoi,rhow,rhog,bs,br,mi0,mg0, &
+!!!!$acc                 limiter_off,icsmall,f1s,f2s,f1r,f2r,eii,ecid,ecr, &
+!!!!$acc                 aimm,bimm,droplet_mass_25um,droplet_mass_40um,tmelt,xxlv,xxls, &
+!!!!$acc                 gamma_bs_plus3,gamma_half_br_plus5,gamma_half_bs_plus5,gamma_2bs_plus2)
 
 !=========================================================
 ! Utilities that are cheaper if the compiler knows that
@@ -356,6 +360,8 @@ subroutine micro_mg_utils_init( kind, rair, rh2o, cpair, tmelt_in, latvap, &
   mg_graupel_props = MGHydrometeorProps(rhog, dsph, lam_bnd_snow)
   mg_hail_props = MGHydrometeorProps(rhoh, dsph, lam_bnd_snow)
 
+  !$acc update device (rv,cpp,tmelt,xxlv,xxls,gamma_bs_plus3, &
+  !$acc                gamma_half_br_plus5,gamma_half_bs_plus5,gamma_2bs_plus2)
 
 end subroutine micro_mg_utils_init
 
@@ -519,7 +525,7 @@ subroutine calc_ab_line(t, qv, xxl, ab)
 
   real(r8) :: dqsdt
 
-  !$acc update device (rv,cpp)
+!!  !$acc update device (rv,cpp)
 
   !$acc data present (t,qv,xxl,ab)&
   !$acc      create  (dqsdt)
@@ -542,7 +548,7 @@ subroutine calc_ab_vect(t, qv, xxl, ab, vlen)
   real(r8) :: dqsdt
   integer :: i
 
-  !$acc update device (rv,cpp)
+!!  !$acc update device (rv,cpp)
 
   !$acc data present (t,qv,xxl,ab)
 
@@ -628,8 +634,6 @@ subroutine size_dist_param_liq_vect(props, qcic, ncic, rho, pgam, lamc, vlen)
   integer :: i, cnt
   real(r8) :: tmp(vlen),pgamp1(vlen)
   real(r8) :: shapeC(vlen),lbnd(vlen),ubnd(vlen)
-
-  !$acc update device (qsmall,pi)
 
   !$acc data present (props,qcic,ncic,rho,pgam,lamc) &
   !$acc      create  (tmp,pgamp1,shapeC,lbnd,ubnd)
@@ -741,8 +745,6 @@ subroutine size_dist_param_basic_vect(props, qic, nic, lam, vlen, n0)
   logical  :: limiterActive, present_n0
   real(r8) :: effDim,shapeCoef,ubnd,lbnd, minMass
 
-  !$acc update device (qsmall)
-
   !$acc data present (props,qic,nic,lam,n0)
 
   limiterActive = limiter_is_on(props%min_mean_mass)
@@ -808,12 +810,11 @@ subroutine size_dist_param_basic_vect2(props, qic, nic, shapeC,lbnd,ubnd, lam, v
   integer  :: cnt
   logical  :: limiterActive, present_n0
   real(r8) :: effDim,shapeCoef, minMass
+
   limiterActive = limiter_is_on(props%min_mean_mass)
   effDim        = props%eff_dim
   minMass       = props%min_mean_mass
   present_n0    = present(n0)
-
-  !$acc update device (qsmall)
 
   !$acc data present (props,qic,nic,shapeC,lbnd,ubnd,lam,n0)
 
@@ -883,8 +884,6 @@ subroutine avg_diameter_vec (q, n, rho_air, rho_sub, avg_diameter, vlen)
    real(r8), intent(in)  :: rho_sub   ! density of the particle substance
    real(r8), intent(out) :: avg_diameter(vlen)
    integer :: i
-
-   !$acc update device (pi)
 
    !$acc data present (q,n,rho_air,avg_diameter)
 
@@ -1023,7 +1022,7 @@ subroutine ice_deposition_sublimation(t, qv, qi, ni, &
   real(r8) :: n0i(vlen)
   integer :: i
 
-  !$acc update device (qsmall,xxls,pi,tmelt)
+!!  !$acc update device (xxls,tmelt)
 
   !$acc data present (t,qv,qi,ni,icldm,rho,dv,qvl) &
   !$acc      present (qvi,vap_dep,ice_sublim,berg) &
@@ -1116,8 +1115,6 @@ subroutine kk2000_liq_autoconversion(microp_uniform, qcic, &
   real(r8), dimension(vlen) :: prc_coef
   integer :: i
 
-  !$acc update device (icsmall,droplet_mass_25um)
-
   !$acc data present (qcic,ncic,rho,relvar,prc,nprc,nprc1) &
   !$acc      create  (prc_coef)
 
@@ -1198,8 +1195,6 @@ subroutine sb2001v2_liq_autoconversion(pgam,qc,nc,qr,rho,relvar,au,nprc,nprc1,vl
   real(r8) :: dum, dum1, nu, pra_coef
   integer :: dumi, i
 
-  !$acc update device (qsmall,droplet_mass_40um)
-
   !$acc data present (pgam,qc,nc,qr,rho,relvar,au,nprc1,nprc) &
   !$acc      create  (dum,dum1,nu,pra_coef)
 
@@ -1265,8 +1260,6 @@ subroutine sb2001v2_accre_cld_water_rain(qc,nc,qr,rho,relvar,pra,npra,vlen)
 
   ! accretion
 
-  !$acc update device (qsmall)
-
   !$acc data present (qc,nc,qr,rho,relvar,pra,npra) &
   !$acc      create  (dum,dum1)
 
@@ -1316,7 +1309,7 @@ subroutine ice_autoconversion(t, qiic, lami, n0i, dcs, prci, nprci, vlen)
   real(r8) :: d_rat
   integer :: i
 
-  !$acc update device (qsmall,tmelt,pi,rhoi)
+!!  !$acc update device (tmelt)
 
   !$acc data present (t,qiic,lami,n0i,prci,nprci) &
   !$acc      create  (m_ip,d_rat)
@@ -1381,7 +1374,7 @@ subroutine immersion_freezing(microp_uniform, t, pgam, lamc, &
   integer  :: i
   real(r8) :: tmp
 
-  !$acc update device (qsmall,tmelt,pi,bimm,aimm,rhow)
+!!  !$acc update device (tmelt)
 
   !$acc data present (t,pgam,lamc,qcic,ncic) &
   !$acc      present (relvar,mnuccc,nnuccc)  &
@@ -1472,8 +1465,6 @@ subroutine contact_freezing (microp_uniform, t, p, rndst, nacon, &
 
   integer  :: i, j
 
-  !$acc update device (qsmall,pi,rhow)
-
   !$acc data present (t,p,rndst,nacon,pgam,lamc) &
   !$acc      present (qcic,ncic,relvar,mnucct,nnucct) &
   !$acc      create  (nslip,ndfaer)
@@ -1549,7 +1540,7 @@ subroutine snow_self_aggregation(t, rho, asn, rhosn, qsic, nsic, nsagg, vlen)
 
   integer :: i
 
-  !$acc update device (qsmall,tmelt,eii,pi,bs)
+!!  !$acc update device (tmelt)
 
   !$acc data present (t,rho,asn,qsic,nsic,nsagg)
 
@@ -1614,7 +1605,7 @@ subroutine accrete_cloud_water_snow(t, rho, asn, uns, mu, qcic, ncic, qsic, &
 
   ! ignore collision of snow with droplets above freezing
 
-  !$acc update device (qsmall,tmelt,rhow,pi,gamma_bs_plus3,bs)
+!!  !$acc update device (tmelt,gamma_bs_plus3)
 
   !$acc data present (t,rho,asn,uns,mu,qcic,ncic,qsic) &
   !$acc      present (pgam,lamc,lams,n0s,psacws,npsacws)
@@ -1667,8 +1658,6 @@ subroutine secondary_ice_production(t, psacws, msacwi, nsacwi, vlen)
   real(r8), dimension(vlen), intent(out) :: msacwi ! MMR
   real(r8), dimension(vlen), intent(out) :: nsacwi ! Number
   integer :: i
-
-  !$acc update device (mi0)
 
   !$acc data present (t,psacws,msacwi,nsacwi)
 
@@ -1739,7 +1728,7 @@ subroutine accrete_rain_snow(t, rho, umr, ums, unr, uns, qric, qsic, &
   real(r8) :: common_factor
   integer :: i
 
-  !$acc update device (icsmall,tmelt,pi,rhow)
+!!  !$acc update device (tmelt)
 
   !$acc data present (t,rho,umr,ums,unr,uns,qric,qsic) &
   !$acc      present (lamr,n0r,lams,n0s,pracs,npracs)
@@ -1790,7 +1779,7 @@ subroutine heterogeneous_rain_freezing(t, qric, nric, lamr, mnuccr, nnuccr, vlen
   real(r8), dimension(vlen), intent(out) :: nnuccr ! Number
   integer :: i
 
-  !$acc update device (qsmall,pi,bimm,aimm,tmelt,rhow)
+!!  !$acc update device (tmelt)
 
   !$acc data present (t,qric,nric,lamr,mnuccr,nnuccr)
 
@@ -1843,8 +1832,6 @@ subroutine accrete_cloud_water_rain(microp_uniform, qric, qcic, &
   real(r8), dimension(vlen) :: pra_coef
 
   integer :: i
-
-  !$acc update device (qsmall)
 
   !$acc data present (qric,qcic,ncic,relvar,accre_enhan,pra,npra) &
   !$acc      create  (pra_coef)
@@ -1901,8 +1888,6 @@ subroutine self_collection_rain(rho, qric, nric, nragg, vlen)
 
   integer :: i
 
-  !$acc update device (qsmall)
-
   !$acc data present (rho,qric,nric,nragg)
 
   !$acc parallel vector_length(VLEN) default(present)
@@ -1953,7 +1938,7 @@ subroutine accrete_cloud_ice_snow(t, rho, asn, qiic, niic, qsic, &
 
   integer :: i
 
-  !$acc update device (qsmall,tmelt,pi,eii,gamma_bs_plus3,bs)
+!!  !$acc update device (tmelt,gamma_bs_plus3)
 
   !$acc data present (t,rho,asn,qiic,niic,qsic,lams,n0s,prai,nprai)
 
@@ -2029,8 +2014,8 @@ subroutine evaporate_sublimate_precip(t, rho, dv, mu, sc, q, qvl, qvi, &
 
   integer :: i
 
-  !$acc update device (qsmall,pi,f1r,f2r,gamma_half_br_plus5,br, &
-  !$acc                xxls,xxlv,f1s,f2s,gamma_half_bs_plus5,bs)
+!!  !$acc update device (gamma_half_br_plus5, &
+!!  !$acc                xxls,xxlv,gamma_half_bs_plus5)
 
   !$acc data present (t,rho,dv,mu,sc,q,qvl,qvi,lcldm,precip_frac,arn,asn) &
   !$acc      present (qcic,qiic,qric,qsic,lamr,n0r,lams,n0s,pre,prds,am_evp_st) &
@@ -2171,8 +2156,8 @@ subroutine evaporate_sublimate_precip_graupel(t, rho, dv, mu, sc, q, qvl, qvi, &
 
   integer :: i
 
-  !$acc update device (qsmall,pi,f1r,f2r,gamma_half_br_plus5,br, &
-  !$acc                xxls,xxlv,f1s,f2s,gamma_half_bs_plus5,bs)
+!!  !$acc update device (gamma_half_br_plus5, &
+!!  !$acc                xxls,xxlv,gamma_half_bs_plus5)
 
   !$acc data present (t,rho,dv,mu,sc,q,qvl,qvi,lcldm,precip_frac) &
   !$acc      present (arn,asn,agn,qcic,qiic,qric,qsic,qgic,lamr)  &
@@ -2307,7 +2292,7 @@ subroutine bergeron_process_snow(t, rho, dv, mu, sc, qvl, qvi, asn, &
 
   integer :: i
 
-  !$acc update device (qsmall,tmelt,xxls,pi,f1s,f2s,gamma_half_bs_plus5,bs)
+!!  !$acc update device (tmelt,xxls,gamma_half_bs_plus5)
 
   !$acc data present (t,rho,dv,mu,sc,qvl,qvi) &
   !$acc      present (asn,qcic,qsic,lams,n0s,bergs)
@@ -2423,8 +2408,6 @@ subroutine graupel_collecting_cld_water(qgic,qcic,ncic,rho,n0g,lamg,bg,agn, &
   real(r8) :: cons
   integer :: i 
 
-  !$acc update device (qsmall)
-
   !$acc data present (qgic,qcic,ncic,rho,lamg,n0g,agn,psacwg,npsacwg)
 
   cons = gamma(bg + 3._r8)*pi/4._r8 * ecid
@@ -2491,8 +2474,6 @@ subroutine graupel_riming_liquid_snow(psacws,qsic,qcic,nsic,rho,rhosn,rhog,asn,l
 !........................................................................
 !Input: PSACWS,qs,qc,n0s,rho,lams,rhos,rhog
 !Output:PSACWS,PGSACW,NSCNG
-
-  !$acc update device (bs,mg0)
 
   !$acc data present (psacws,qsic,qcic,nsic,rho,asn,lams,n0s,pgsacw,nscng)
 
@@ -2744,8 +2725,6 @@ subroutine graupel_rime_splintering(t,qcic,qric,qgic,psacwg,pracg,&
   real(r8) :: fmult
   real(r8) :: tm_3,tm_5,tm_8
 
-  !$acc update device (mmult)
-
   !$acc data present (t,qcic,qric,qgic,psacwg,pracg) &
   !$acc      present (qmultg,nmultg,qmultrg,nmultrg)
 
@@ -2839,7 +2818,7 @@ pure function limiter_is_on(lim)
   real(r8), intent(in) :: lim
   logical :: limiter_is_on
 
-  !$acc update device (limiter_off)
+!!  !$acc update device (limiter_off)
 
   limiter_is_on = transfer(lim, limiter_off) /= limiter_off
 
