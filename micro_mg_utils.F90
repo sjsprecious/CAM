@@ -257,12 +257,6 @@ real(r8) :: gamma_2bs_plus2
 !$acc                 gamma_bs_plus3,gamma_half_br_plus5, &
 !$acc                 gamma_half_bs_plus5,gamma_2bs_plus2)
 
-!!!!$acc declare create (rv,cpp,mmult, &
-!!!!$acc                 pi,qsmall,rhoi,rhow,rhog,bs,br,mi0,mg0, &
-!!!!$acc                 limiter_off,icsmall,f1s,f2s,f1r,f2r,eii,ecid,ecr, &
-!!!!$acc                 aimm,bimm,droplet_mass_25um,droplet_mass_40um,tmelt,xxlv,xxls, &
-!!!!$acc                 gamma_bs_plus3,gamma_half_br_plus5,gamma_half_bs_plus5,gamma_2bs_plus2)
-
 !=========================================================
 ! Utilities that are cheaper if the compiler knows that
 ! some argument is an integer.
@@ -525,8 +519,6 @@ subroutine calc_ab_line(t, qv, xxl, ab)
 
   real(r8) :: dqsdt
 
-!!  !$acc update device (rv,cpp)
-
   !$acc data present (t,qv,xxl,ab)&
   !$acc      create  (dqsdt)
 
@@ -547,8 +539,6 @@ subroutine calc_ab_vect(t, qv, xxl, ab, vlen)
   real(r8), intent(out) :: ab(vlen)
   real(r8) :: dqsdt
   integer :: i
-
-!!  !$acc update device (rv,cpp)
 
   !$acc data present (t,qv,xxl,ab)
 
@@ -1022,8 +1012,6 @@ subroutine ice_deposition_sublimation(t, qv, qi, ni, &
   real(r8) :: n0i(vlen)
   integer :: i
 
-!!  !$acc update device (xxls,tmelt)
-
   !$acc data present (t,qv,qi,ni,icldm,rho,dv,qvl) &
   !$acc      present (qvi,vap_dep,ice_sublim,berg) &
   !$acc      create  (ab,qiic,niic,lami,n0i)
@@ -1309,8 +1297,6 @@ subroutine ice_autoconversion(t, qiic, lami, n0i, dcs, prci, nprci, vlen)
   real(r8) :: d_rat
   integer :: i
 
-!!  !$acc update device (tmelt)
-
   !$acc data present (t,qiic,lami,n0i,prci,nprci) &
   !$acc      create  (m_ip,d_rat)
 
@@ -1373,8 +1359,6 @@ subroutine immersion_freezing(microp_uniform, t, pgam, lamc, &
   real(r8), dimension(vlen) :: dum
   integer  :: i
   real(r8) :: tmp
-
-!!  !$acc update device (tmelt)
 
   !$acc data present (t,pgam,lamc,qcic,ncic) &
   !$acc      present (relvar,mnuccc,nnuccc)  &
@@ -1540,8 +1524,6 @@ subroutine snow_self_aggregation(t, rho, asn, rhosn, qsic, nsic, nsagg, vlen)
 
   integer :: i
 
-!!  !$acc update device (tmelt)
-
   !$acc data present (t,rho,asn,qsic,nsic,nsagg)
 
   !$acc parallel vector_length(VLEN) default(present)
@@ -1604,8 +1586,6 @@ subroutine accrete_cloud_water_snow(t, rho, asn, uns, mu, qcic, ncic, qsic, &
   integer :: i
 
   ! ignore collision of snow with droplets above freezing
-
-!!  !$acc update device (tmelt,gamma_bs_plus3)
 
   !$acc data present (t,rho,asn,uns,mu,qcic,ncic,qsic) &
   !$acc      present (pgam,lamc,lams,n0s,psacws,npsacws)
@@ -1728,8 +1708,6 @@ subroutine accrete_rain_snow(t, rho, umr, ums, unr, uns, qric, qsic, &
   real(r8) :: common_factor
   integer :: i
 
-!!  !$acc update device (tmelt)
-
   !$acc data present (t,rho,umr,ums,unr,uns,qric,qsic) &
   !$acc      present (lamr,n0r,lams,n0s,pracs,npracs)
 
@@ -1778,8 +1756,6 @@ subroutine heterogeneous_rain_freezing(t, qric, nric, lamr, mnuccr, nnuccr, vlen
   real(r8), dimension(vlen), intent(out) :: mnuccr ! MMR
   real(r8), dimension(vlen), intent(out) :: nnuccr ! Number
   integer :: i
-
-!!  !$acc update device (tmelt)
 
   !$acc data present (t,qric,nric,lamr,mnuccr,nnuccr)
 
@@ -1938,8 +1914,6 @@ subroutine accrete_cloud_ice_snow(t, rho, asn, qiic, niic, qsic, &
 
   integer :: i
 
-!!  !$acc update device (tmelt,gamma_bs_plus3)
-
   !$acc data present (t,rho,asn,qiic,niic,qsic,lams,n0s,prai,nprai)
 
   !$acc parallel vector_length(VLEN) default(present)
@@ -2013,9 +1987,6 @@ subroutine evaporate_sublimate_precip(t, rho, dv, mu, sc, q, qvl, qvi, &
   real(r8), dimension(vlen) :: dum
 
   integer :: i
-
-!!  !$acc update device (gamma_half_br_plus5, &
-!!  !$acc                xxls,xxlv,gamma_half_bs_plus5)
 
   !$acc data present (t,rho,dv,mu,sc,q,qvl,qvi,lcldm,precip_frac,arn,asn) &
   !$acc      present (qcic,qiic,qric,qsic,lamr,n0r,lams,n0s,pre,prds,am_evp_st) &
@@ -2156,9 +2127,6 @@ subroutine evaporate_sublimate_precip_graupel(t, rho, dv, mu, sc, q, qvl, qvi, &
 
   integer :: i
 
-!!  !$acc update device (gamma_half_br_plus5, &
-!!  !$acc                xxls,xxlv,gamma_half_bs_plus5)
-
   !$acc data present (t,rho,dv,mu,sc,q,qvl,qvi,lcldm,precip_frac) &
   !$acc      present (arn,asn,agn,qcic,qiic,qric,qsic,qgic,lamr)  &
   !$acc      present (n0r,lams,n0s,lamg,n0g,pre,prds,prdg,am_evp_st) &
@@ -2291,8 +2259,6 @@ subroutine bergeron_process_snow(t, rho, dv, mu, sc, qvl, qvi, asn, &
   real(r8) :: eps    ! 1/ sat relaxation timescale
 
   integer :: i
-
-!!  !$acc update device (tmelt,xxls,gamma_half_bs_plus5)
 
   !$acc data present (t,rho,dv,mu,sc,qvl,qvi) &
   !$acc      present (asn,qcic,qsic,lams,n0s,bergs)
@@ -2817,8 +2783,6 @@ pure function limiter_is_on(lim)
 
   real(r8), intent(in) :: lim
   logical :: limiter_is_on
-
-!!  !$acc update device (limiter_off)
 
   limiter_is_on = transfer(lim, limiter_off) /= limiter_off
 
