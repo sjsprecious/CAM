@@ -176,6 +176,24 @@ subroutine cam_init( &
    ! Initialize grids and dynamics grid decomposition
    call dyn_grid_init()
 
+#if defined(__OPENACC__)
+   ! get current MPI rank
+   call mpi_comm_rank (mpicom, rank, ierror)
+   if (ierror /= 0) then
+      call endrun("Fail to get the MPI rank info inside the cam_init subroutine!")
+   end if
+   ! get available GPU device number 
+   num_dev = acc_get_num_devices( acc_device_default )
+   if (num_dev == 0) then
+      call endrun("Fail to find GPU on this node!")
+   end if
+   write(iulog, *) "MPI rank = ", rank, ", Number of GPU = ", num_dev
+   ! choose different GPUs for different MPI ranks
+   dev_id = mod(rank, num_dev)
+   call acc_set_device_num( dev_id, acc_device_default )
+   !$acc init device_num( dev_id )
+#endif
+
    ! Initialize physics grid decomposition
    call phys_grid_init()
 
@@ -218,22 +236,6 @@ subroutine cam_init( &
    call intht(model_doi_url)
 
    call cam_snapshot_deactivate()
-
-#if defined(__OPENACC__)
-   ! get current MPI rank
-   call mpi_comm_rank (mpicom, rank, ierror)
-   if (ierror /= 0) then
-      call endrun("Fail to get the MPI rank info inside the cam_init subroutine!")
-   end if
-   ! get available GPU device number 
-   num_dev = acc_get_num_devices( acc_device_default )
-   if (num_dev == 0) then
-      call endrun("Fail to find GPU on this node!")
-   end if
-   write(iulog, *) "MPI rank = ", rank, ", Number of GPU = ", num_dev
-   ! choose different GPUs for different MPI ranks
-   call acc_set_device_num( mod(rank, num_dev), acc_device_default )
-#endif
 
 !!!#if defined(__OPENACC__)
 !!!   ! get local MPI rank
