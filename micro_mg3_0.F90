@@ -1603,7 +1603,9 @@ subroutine micro_mg_tend ( &
         precip_frac(i,k) = cldm(i,k)
      end do
   end do
+  !$acc end parallel
 
+  !$acc parallel vector_length(VLEN) default(present)
   if (precip_frac_method == MG_PRECIP_FRAC_INCLOUD) then
      !$acc loop seq
      do k=2,nlev
