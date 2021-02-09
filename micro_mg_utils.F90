@@ -407,18 +407,18 @@ subroutine rising_factorial_r8_vec(x, n, res,vlen)
   real(r8), intent(out) :: res(vlen)
   integer :: i
   real(r8) :: tmp(vlen)
+  real(r8) :: tmp_gpu
 
 #if defined(__OPENACC__)
-  !$acc data present (x,res) &
-  !$acc      create  (tmp)
+  !$acc data present (x,res)
 
   !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector
+  !$acc loop gang vector private(tmp_gpu)
   do i=1,vlen
-     tmp(i) = x(i)+n
-     res(i) = gamma(tmp(i))
-     tmp(i) = gamma(x(i))
-     res(i) = res(i)/tmp(i)
+     tmp_gpu = x(i)+n
+     res(i)  = gamma(tmp_gpu)
+     tmp_gpu = gamma(x(i))
+     res(i)  = res(i)/tmp_gpu
   end do
   !$acc end parallel
 
@@ -465,41 +465,40 @@ subroutine rising_factorial_integer_vec(x, n, res,vlen)
   real(r8), intent(out) :: res(vlen)
 
   integer  :: i,j
-  real(r8) :: factor(vlen)
+  real(r8) :: factor
 
-  !$acc data present (x,res) &
-  !$acc      create  (factor)
+  !$acc data present (x,res)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) private(factor)
   !$acc loop gang vector
   do i=1,vlen
      res(i)    = 1._r8
-     factor(i) = x(i)
+     factor    = x(i)
   end do
 
   if (n == 3) then
     !$acc loop gang vector
     do i=1,vlen
-       res(i)    = res(i) * factor(i)
-       factor(i) = factor(i) + 1._r8
-       res(i)    = res(i) * factor(i)
-       factor(i) = factor(i) + 1._r8
-       res(i)    = res(i) * factor(i)
+       res(i)    = res(i) * factor
+       factor    = factor + 1._r8
+       res(i)    = res(i) * factor
+       factor    = factor + 1._r8
+       res(i)    = res(i) * factor
     end do
   elseif (n == 2) then
     !$acc loop gang vector
     do i=1,vlen
-       res(i)    = res(i) * factor(i)
-       factor(i) = factor(i) + 1._r8
-       res(i)    = res(i) * factor(i)
+       res(i)    = res(i) * factor
+       factor    = factor + 1._r8
+       res(i)    = res(i) * factor
     end do
   else
     !$acc loop seq
     do j = 1, n
        !$acc loop gang vector
        do i = 1, vlen
-          res(i)    = res(i) * factor(i)
-          factor(i) = factor(i) + 1._r8
+          res(i)    = res(i) * factor
+          factor    = factor + 1._r8
        end do
     end do
   end if
@@ -519,8 +518,7 @@ subroutine calc_ab_line(t, qv, xxl, ab)
 
   real(r8) :: dqsdt
 
-  !$acc data present (t,qv,xxl,ab)&
-  !$acc      create  (dqsdt)
+  !$acc data present (t,qv,xxl,ab)
 
   dqsdt = xxl*qv / (rv * t**2)
   ab = 1._r8 + dqsdt*xxl/cpp
@@ -626,7 +624,7 @@ subroutine size_dist_param_liq_vect(props, qcic, ncic, rho, pgam, lamc, vlen)
   real(r8) :: shapeC(vlen),lbnd(vlen),ubnd(vlen)
 
   !$acc data present (props,qcic,ncic,rho,pgam,lamc) &
-  !$acc      create  (tmp,pgamp1,shapeC,lbnd,ubnd)
+  !$acc      create (tmp,pgamp1,shapeC,lbnd,ubnd)
 
     !$acc parallel vector_length(VLEN) default(present)
     !$acc loop gang vector
@@ -915,8 +913,9 @@ subroutine var_coef_r8_vect(relvar, a, res, vlen)
   integer  :: i
   real(r8) :: tmpA(vlen)
 
-  !$acc data present (relvar,res) &
-  !$acc      create  (tmpA)
+  !$acc enter data create (tmpA)
+
+  !$acc data present (relvar,res)
 
    call rising_factorial(relvar,a,tmpA,vlen)
    !$acc parallel vector_length(VLEN) default(present)
@@ -957,8 +956,9 @@ subroutine var_coef_integer_vect(relvar, a, res, vlen)
   integer  :: i
   real(r8) :: tmp(vlen)
 
-  !$acc data present (relvar,res) &
-  !$acc      create  (tmp)
+  !$acc enter data create (tmp)
+
+  !$acc data present (relvar,res)
 
   call rising_factorial(relvar, a,tmp,vlen)
   !$acc parallel vector_length(VLEN) default(present)
@@ -1183,8 +1183,7 @@ subroutine sb2001v2_liq_autoconversion(pgam,qc,nc,qr,rho,relvar,au,nprc,nprc1,vl
   real(r8) :: dum, dum1, nu, pra_coef
   integer :: dumi, i
 
-  !$acc data present (pgam,qc,nc,qr,rho,relvar,au,nprc1,nprc) &
-  !$acc      create  (dum,dum1,nu,pra_coef)
+  !$acc data present (pgam,qc,nc,qr,rho,relvar,au,nprc1,nprc)
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector private(dumi,nu,dum,dum1)
@@ -1248,8 +1247,7 @@ subroutine sb2001v2_accre_cld_water_rain(qc,nc,qr,rho,relvar,pra,npra,vlen)
 
   ! accretion
 
-  !$acc data present (qc,nc,qr,rho,relvar,pra,npra) &
-  !$acc      create  (dum,dum1)
+  !$acc data present (qc,nc,qr,rho,relvar,pra,npra)
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector private(dum,dum1)
@@ -1297,8 +1295,7 @@ subroutine ice_autoconversion(t, qiic, lami, n0i, dcs, prci, nprci, vlen)
   real(r8) :: d_rat
   integer :: i
 
-  !$acc data present (t,qiic,lami,n0i,prci,nprci) &
-  !$acc      create  (m_ip,d_rat)
+  !$acc data present (t,qiic,lami,n0i,prci,nprci)
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector private(d_rat,m_ip)
