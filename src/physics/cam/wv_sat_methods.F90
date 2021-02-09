@@ -707,8 +707,9 @@ subroutine OldGoffGratch_svp_water_vect(t,es,vlen)
 
   !$acc update device (tboil)
 
-  !$acc data present (t,es) &
-  !$acc      create  (ps,e1,e2,f1,f2,f3,f4,f5,f)
+  !$acc enter data create (ps,e1,e2,f1,f2,f3,f4,f5,f)
+
+  !$acc data present (t,es)
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector
@@ -752,8 +753,9 @@ subroutine OldGoffGratch_svp_ice_vect(t,es,vlen)
 
   !$acc update device (tmelt)
 
-  !$acc data present (t,es) &
-  !$acc      create  (term1,term2,term3)
+  !$acc enter data create  (term1,term2,term3)
+  
+  !$acc data present (t,es)
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector
