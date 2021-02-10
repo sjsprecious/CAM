@@ -504,6 +504,9 @@ subroutine micro_mg_tend ( &
        graupel_rime_splintering, &
        evaporate_sublimate_precip_graupel
 
+  ! use NVTX module to profile GPU codes
+  use nvtx_mod
+
   !Authors: Hugh Morrison, Andrew Gettelman, NCAR, Peter Caldwell, LLNL
   ! e-mail: morrison@ucar.edu, andrew@ucar.edu
 
@@ -1019,7 +1022,7 @@ subroutine micro_mg_tend ( &
 !$acc               prds,psacr,ncic,niic,nsic,nric,qiic,qsic,qric,dumi,dumni,  &
 !$acc               dumr,dumnr,dums,dumns,qtmpAI,qvnAI,dumc,dumnc,qcic)
 
-  !!call t_startf ('micro_mg3_init')
+  call nvtxStartRange("mg3_bigkernel", 1)
 
   ! Copies of input concentrations that may be changed internally.
   !$acc parallel vector_length(VLEN) default(present)
@@ -1117,7 +1120,7 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  !!call t_stopf ('micro_mg3_init')
+  call nvtxEndRange
 
   !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
   ! Get humidity and saturation vapor pressures
@@ -1129,7 +1132,7 @@ subroutine micro_mg_tend ( &
 
   !!call t_stopf ('micro_mg3_qsat')
 
-  !!call t_startf ('micro_mg3_init')
+  call nvtxStartRange("mg3_bigkernel", 1)
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2)
@@ -1364,8 +1367,6 @@ subroutine micro_mg_tend ( &
      end do
   end do
 
-  !!call t_stopf ('micro_mg3_init')
-
   !ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
   ! droplet activation
   ! get provisional droplet number after activation. This is used for
@@ -1377,8 +1378,6 @@ subroutine micro_mg_tend ( &
 
   ! output activated liquid and ice (convert from #/kg -> #/m3)
   !--------------------------------------------------
-
-  !!call t_startf ('micro_mg3_misc')
 
   !$acc loop gang vector collapse(2)
   do k=1,nlev
@@ -1605,6 +1604,8 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
+  call nvtxEndRange
+
   !$acc parallel vector_length(VLEN) default(present)
   if (precip_frac_method == MG_PRECIP_FRAC_INCLOUD) then
      !$acc loop seq
@@ -1634,8 +1635,6 @@ subroutine micro_mg_tend ( &
 
   endif
   !$acc end parallel
-
-  !!call t_stopf ('micro_mg3_misc')
 
   !ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
   ! get size distribution parameters based on in-cloud cloud water
@@ -2183,7 +2182,7 @@ subroutine micro_mg_tend ( &
 
   end if ! end do_graupel/hail loop
 
-  !!call t_startf ('micro_mg3_misc')
+  call nvtxStartRange("mg3_bigkernel", 1) 
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2) private(dum,ratio)
@@ -2499,7 +2498,7 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  !!call t_stopf ('micro_mg3_misc')
+  call nvtxEndRange
 
   !!call t_startf ('micro_mg3_qsat')
 
@@ -2566,7 +2565,7 @@ subroutine micro_mg_tend ( &
 
   !!call t_stopf ('micro_mg3_qsat')
 
-  !!call t_startf ('micro_mg3_misc')
+  call nvtxStartRange("mg3_bigkernel", 1) 
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2) private(dum)
@@ -2811,7 +2810,7 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  !!call t_stopf ('micro_mg3_misc')
+  call nvtxEndRange
 
   !!call t_startf ('micro_mg3_size_dist_param_basic_vect')
 
@@ -2842,7 +2841,7 @@ subroutine micro_mg_tend ( &
 
   ! Re-apply droplet activation tendency
 
-  !!call t_startf ('micro_mg3_misc')
+  call nvtxStartRange("mg3_bigkernel", 1) 
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2)
@@ -2931,7 +2930,7 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  !!call t_stopf ('micro_mg3_misc')
+  call nvtxEndRange 
 
   ! obtain new slope parameter to avoid possible singularity
   !!call t_startf ('micro_mg3_size_dist_param_basic_vect')
@@ -2946,7 +2945,7 @@ subroutine micro_mg_tend ( &
 
   !!call t_stopf ('micro_mg3_size_dist_param_liq_vect')
 
-  !!call t_startf ('micro_mg3_misc')
+  call nvtxStartRange("mg3_bigkernel", 1) 
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2) private(dum1,dum2,dum3,dum4)
@@ -3016,7 +3015,7 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  !!call t_stopf ('micro_mg3_misc')
+  call nvtxEndRange 
 
   !!call t_startf ('micro_mg3_size_dist_param_basic_vect')
 
@@ -3034,7 +3033,7 @@ subroutine micro_mg_tend ( &
 
   !!call t_stopf ('micro_mg3_size_dist_param_basic_vect')
 
-  !!call t_startf ('micro_mg3_misc')
+  call nvtxStartRange("mg3_bigkernel", 1) 
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2)
@@ -3110,7 +3109,7 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  !!call t_stopf ('micro_mg3_misc')
+  call nvtxEndRange
 
   ! begin sedimentation
 
@@ -3154,7 +3153,7 @@ subroutine micro_mg_tend ( &
   ! get new update for variables that includes sedimentation tendency
   ! note : here dum variables are grid-average, NOT in-cloud
 
-  !!call t_startf ('micro_mg3_misc')
+  call nvtxStartRange("mg3_bigkernel", 1)
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2)
@@ -3261,7 +3260,7 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  !!call t_stopf ('micro_mg3_misc')
+  call nvtxEndRange
 
   !!call t_startf ('micro_mg3_size_dist_param_basic_vect')
 
@@ -3329,7 +3328,7 @@ subroutine micro_mg_tend ( &
 
   if (do_cldice) then
 
-     !!call t_startf ('micro_mg3_misc')
+     call nvtxStartRange("mg3_bigkernel", 1)
 
      !$acc parallel vector_length(VLEN) default(present)
      !$acc loop gang vector collapse(2) private(dum)
@@ -3418,7 +3417,7 @@ subroutine micro_mg_tend ( &
      end do
      !$acc end parallel
 
-     !!call t_stopf ('micro_mg3_misc')
+     call nvtxEndRange 
 
      !!call t_startf ('micro_mg3_qsat')
 
@@ -3660,7 +3659,7 @@ subroutine micro_mg_tend ( &
 
   !!call t_stopf ('micro_mg3_size_dist_param_liq_vect')
 
-  !!call t_startf ('micro_mg3_misc')
+  call nvtxStartRange("mg3_bigkernel", 1)
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2)
@@ -3688,7 +3687,7 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  !!call t_stopf ('micro_mg3_misc')
+  call nvtxEndRange
 
   !!call t_startf ('micro_mg3_size_dist_param_basic_vect')
 
@@ -3696,7 +3695,7 @@ subroutine micro_mg_tend ( &
 
   !!call t_stopf ('micro_mg3_size_dist_param_basic_vect')
 
-  !!call t_startf ('micro_mg3_misc')
+  call nvtxStartRange("mg3_bigkernel", 1)
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2)
@@ -3722,7 +3721,7 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  !!call t_stopf ('micro_mg3_misc')
+  call nvtxEndRange
 
   !!call t_startf ('micro_mg3_size_dist_param_basic_vect')
 
@@ -3730,7 +3729,7 @@ subroutine micro_mg_tend ( &
 
   !!call t_stopf ('micro_mg3_size_dist_param_basic_vect')
 
-  !!call t_startf ('micro_mg3_misc')
+  call nvtxStartRange("mg3_bigkernel", 1)
 
   !$acc parallel vector_length(VLEN) default(present) 
   !$acc loop gang vector collapse(2)
@@ -3757,7 +3756,7 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  !!call t_stopf ('micro_mg3_misc')
+  call nvtxEndRange
 
   !!call t_startf ('micro_mg3_size_dist_param_basic_vect')
 
@@ -3770,7 +3769,7 @@ subroutine micro_mg_tend ( &
 
   !!call t_stopf ('micro_mg3_size_dist_param_basic_vect')
 
-  !!call t_startf ('micro_mg3_misc')
+  call nvtxStartRange("mg3_bigkernel", 1)
 
   !$acc parallel vector_length(VLEN) default(present) 
   !$acc loop gang vector collapse(2)
@@ -3826,7 +3825,7 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  !!call t_stopf ('micro_mg3_misc')
+  call nvtxEndRange
 
   !!call t_startf ('micro_mg3_avg_diameter_vec')
 
@@ -3836,7 +3835,7 @@ subroutine micro_mg_tend ( &
 
   !!call t_stopf ('micro_mg3_avg_diameter_vec')
 
-  !!call t_startf ('micro_mg3_misc')
+  call nvtxStartRange("mg3_bigkernel", 1)
 
   !$acc parallel vector_length(VLEN) default(present) 
   !$acc loop gang vector collapse(2)
@@ -3867,7 +3866,7 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  !!call t_stopf ('micro_mg3_misc')
+  call nvtxEndRange
 
   !!call t_startf ('micro_mg3_avg_diameter_vec')
 
@@ -3877,7 +3876,7 @@ subroutine micro_mg_tend ( &
 
   !!call t_stopf ('micro_mg3_avg_diameter_vec')
 
-  !!call t_startf ('micro_mg3_misc')
+  call nvtxStartRange("mg3_bigkernel", 1)
 
   !$acc parallel vector_length(VLEN) default(present) 
   !$acc loop gang vector collapse(2)
@@ -3910,7 +3909,7 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  !!call t_stopf ('micro_mg3_misc')
+  call nvtxEndRange
 
   !!call t_startf ('micro_mg3_avg_diameter_vec')
 
@@ -3920,7 +3919,7 @@ subroutine micro_mg_tend ( &
 
   !!call t_stopf ('micro_mg3_avg_diameter_vec')
 
-  !!call t_startf ('micro_mg3_misc')
+  call nvtxStartRange("mg3_bigkernel", 1)
 
   !$acc parallel vector_length(VLEN) default(present) 
   !$acc loop gang vector collapse(2)
@@ -4040,7 +4039,7 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  !!call t_stopf ('micro_mg3_misc')
+  call nvtxEndRange
 
 !$acc end data 
 
