@@ -41,6 +41,8 @@ module micro_mg_utils
 use shr_spfn_mod, only: gamma => shr_spfn_gamma
 #endif
 
+use ppgrid,       only: pcols, pver
+
 implicit none
 private
 save
@@ -252,6 +254,8 @@ real(r8) :: gamma_bs_plus3
 real(r8) :: gamma_half_br_plus5
 real(r8) :: gamma_half_bs_plus5
 real(r8) :: gamma_2bs_plus2
+
+integer, parameter :: max_vlen = pcols*pver
 
 !$acc declare create (rv,cpp,tmelt,xxlv,xxls, &
 !$acc                 gamma_bs_plus3,gamma_half_br_plus5, &
@@ -620,11 +624,12 @@ subroutine size_dist_param_liq_vect(props, qcic, ncic, rho, pgam, lamc, vlen)
 
   ! local variables
   integer :: i, cnt
-  real(r8) :: tmp(vlen),pgamp1(vlen)
-  real(r8) :: shapeC(vlen),lbnd(vlen),ubnd(vlen)
+  real(r8) :: tmp(max_vlen),pgamp1(max_vlen)
+  real(r8) :: shapeC(max_vlen),lbnd(max_vlen),ubnd(max_vlen)
 
-  !$acc data present (props,qcic,ncic,rho,pgam,lamc) &
-  !$acc      create (tmp,pgamp1,shapeC,lbnd,ubnd)
+  !$acc enter data create (tmp,pgamp1,shapeC,lbnd,ubnd)
+
+  !$acc data present (props,qcic,ncic,rho,pgam,lamc)
 
     !$acc parallel vector_length(VLEN) default(present)
     !$acc loop gang vector
@@ -643,9 +648,9 @@ subroutine size_dist_param_liq_vect(props, qcic, ncic, rho, pgam, lamc, vlen)
     ! The 3D case is so common and optimizable that we specialize
     ! it:
     if (props%eff_dim == 3._r8) then
-       call rising_factorial(pgamp1,3,tmp,vlen)
+       call rising_factorial(pgamp1(1:vlen),3,tmp(1:vlen),vlen)
     else
-       call rising_factorial(pgamp1, props%eff_dim,tmp,vlen)
+       call rising_factorial(pgamp1(1:vlen), props%eff_dim,tmp(1:vlen),vlen)
     end if
 
     !$acc parallel vector_length(VLEN) default(present)
@@ -660,7 +665,7 @@ subroutine size_dist_param_liq_vect(props, qcic, ncic, rho, pgam, lamc, vlen)
     end do
     !$acc end parallel 
 
-    call size_dist_param_basic(props, qcic, ncic, shapeC, lbnd, ubnd, lamc, vlen)
+    call size_dist_param_basic(props, qcic(1:vlen), ncic(1:vlen), shapeC(1:vlen), lbnd(1:vlen), ubnd(1:vlen), lamc(1:vlen), vlen)
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector
@@ -913,9 +918,8 @@ subroutine var_coef_r8_vect(relvar, a, res, vlen)
   integer  :: i
   real(r8) :: tmpA(vlen)
 
-  !$acc enter data create (tmpA)
-
-  !$acc data present (relvar,res)
+  !$acc data present (relvar,res) &
+  !$acc      create (tmpA)
 
    call rising_factorial(relvar,a,tmpA,vlen)
    !$acc parallel vector_length(VLEN) default(present)
@@ -956,9 +960,8 @@ subroutine var_coef_integer_vect(relvar, a, res, vlen)
   integer  :: i
   real(r8) :: tmp(vlen)
 
-  !$acc enter data create (tmp)
-
-  !$acc data present (relvar,res)
+  !$acc data present (relvar,res) &
+  !$acc      create (tmp)
 
   call rising_factorial(relvar, a,tmp,vlen)
   !$acc parallel vector_length(VLEN) default(present)
