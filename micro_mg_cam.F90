@@ -1077,7 +1077,6 @@ subroutine micro_mg_cam_init(pbuf2d)
       call addfld ('ANGRAU',      (/ 'lev' /),  'A', 'm-3',      'Average graupel/hail number conc'               )
    end if
 
-   
    ! qc limiter (only output in versions 1.5 and later)
    if (.not. (micro_mg_version == 1 .and. micro_mg_sub_version == 0)) then
       call addfld('QCRAT', (/ 'lev' /), 'A', 'fraction', 'Qc Limiter: Fraction of qc tendency applied')
@@ -1329,6 +1328,8 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    use wv_saturation,   only: qsat
 
    use perf_mod
+   use time_manager,    only: is_first_step
+   use netcdf
 
    type(physics_state),         intent(in)    :: state
    type(physics_ptend),         intent(out)   :: ptend
@@ -1955,6 +1956,54 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
                                             mu_subgrid, lambdac_subgrid
 #endif
 
+   ! for netCDF output only
+   character(len=128) :: FILE_NAME
+   integer            :: ncid, mgncol_id, lev_id, bin_id, var_id
+   integer            :: dimid1(2), dimid2(3), varid(30)
+   integer, parameter :: len_dimid1 = 28, len_dimid2 = 2
+   character(8)       :: date
+
+   character(len=128) :: var_dimid1(len_dimid1)  = (/ 'packed_t',  'packed_q', 'packed_qc',              &
+                                                      'packed_qi', 'packed_nc', 'packed_ni',             &
+                                                      'packed_qr', 'packed_qs', 'packed_nr',             &
+                                                      'packed_ns', 'packed_qg', 'packed_ng',             &
+                                                      'packed_relvar', 'packed_accre_enhan',             &
+                                                      'packed_p',  'packed_pdel', 'packed_cldn',         &
+                                                      'packed_liqcldf', 'packed_icecldf',                &
+                                                      'packed_qsatfac', 'packed_naai',                   &     
+                                                      'packed_npccn', 'packed_tnd_qsnow',                &
+                                                      'packed_tnd_nsnow', 'packed_re_ice',               &
+                                                      'packed_frzimm', 'packed_frzcnt', 'packed_frzdep' /)
+   character(len=128) :: unit_dimid1(len_dimid1) = (/ 'K', 'kg/kg', 'kg/kg', 'kg/kg', '1/kg',              &
+                                                      '1/kg', 'kg/kg', 'kg/kg', '1/kg', '1/kg',            &
+                                                      'kg/kg', '1/kg', 'unitless', 'unitless',             &
+                                                      'Pa', 'Pa', 'unitless', 'unitless',                  &
+                                                      'unitless', 'unitless', '1/kg', '1/kg*s',            &
+                                                      'kg/kg/s', '#/kg/s', 'm', '1/cm3', '1/cm3', '1/cm3' /)
+   character(len=128) :: desc_dimid1(len_dimid1) = (/ 'temperature', 'h20 vapor mixing ratio',                 &
+                                                      'cloud water mixing ratio', 'cloud ice mixing ratio',    &
+                                                      'cloud water number conc', 'cloud ice number conc',      &
+                                                      'rain mixing ratio', 'snow mixing ratio',                &
+                                                      'rain number conc', 'snow number conc',                  &
+                                                      'graupel/hail mixing ratio', 'graupel/hail number conc', &
+                                                      'cloud water relative variance',                         &
+                                                      'optional accretion enhancement factor', 'air pressure', &
+                                                      'pressure difference across level', 'cloud fraction',    &
+                                                      'liquid cloud fraction', 'ice cloud fraction',           &
+                                                      'subgrid cloud water saturation scaling factor',         &
+                                                      'ice nucleation number (from microp_aero_ts)',           &
+                                                      'ccn activated number tendency (from microp_aero_ts)',   &
+                                                      'snow mass tendency', 'snow number tendency',            &
+                                                      'ice effective radius',                                  &
+                                                      'Number tendency due to immersion freezing',             &
+                                                      'Number tendency due to contact freezing',               &
+                                                      'Number tendency due to deposition nucleation'          /)
+
+   character(len=128) :: var_dimid2(len_dimid2)  = (/ 'packed_rndst', 'packed_nacon' /)
+   character(len=128) :: unit_dimid2(len_dimid2) = (/ 'm', '1/m^3' /)
+   character(len=128) :: desc_dimid2(len_dimid2) = (/ 'radius of each dust bin, for contact freezing (from microp_aero_ts)',  &
+                                                      'number in each dust bin, for contact freezing  (from microp_aero_ts)' /)
+
    !-------------------------------------------------------------------------------
 
    lchnk = state%lchnk
@@ -1968,6 +2017,65 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
              ncic_subgrid(ngrdcol,nlev-top_lev+1),rho_subgrid(ngrdcol,nlev-top_lev+1), &
              mu_subgrid(ngrdcol,nlev-top_lev+1),lambdac_subgrid(ngrdcol,nlev-top_lev+1) )
 #endif
+
+   if (is_first_step()) then
+
+      ! create netCDF file for KGen input, use masterproc only
+      if (masterproc) then
+
+         FILE_NAME = "mg3_kgen_input.nc"
+
+         ! Create the netCDF file. The nf90_clobber parameter tells 
+         ! netCDF to overwrite this file, if it already exists.
+         call check ( nf90_create(FILE_NAME, NF90_CLOBBER, ncid) )
+
+         ! Define the dimensions. NetCDF will hand back an ID for each. 
+         ! make nsteps unlimited dimension when we need to output tiny time step
+         ! Reference: 
+         !   1. https://www.unidata.ucar.edu/software/netcdf/faq-lfs.html
+         !   2. https://www.unidata.ucar.edu/software/netcdf/documentation/historic/netcdf/NetCDF-Classic-Format-Limitations.html
+         !   3. https://www.unidata.ucar.edu/software/netcdf/docs-fortran/f90_dimensions.html 
+         call check( nf90_def_dim(ncid, "mgncol", mgncol, mgncol_id) )
+         call check( nf90_def_dim(ncid, "nlev", nlev, lev_id) )
+         call check( nf90_def_dim(ncid, "bin", 4, bin_id) )
+
+         ! The dimids array is used to pass the IDs of the dimensions of the variables.
+         dimid1 = (/mgncol_id, lev_id/)
+         dimid2 = (/mgncol_id, lev_id, bin_id/)
+
+         ! Define the variable.
+         do i = 1, len_dimid1
+            call check( nf90_def_var(ncid, trim(var_dimid1(i)), NF90_DOUBLE, dimid1, varid(i)) )
+         end do
+         do i = 1, len_dimid2
+            call check( nf90_def_var(ncid, trim(var_dimid2(i)), NF90_DOUBLE, dimid2, varid(i+len_dimid1)) )
+         end do
+
+         ! Assign unit and text attributes to var data. 
+         do i = 1, len_dimid1
+            call check( nf90_put_att(ncid, varid(i), "units", unit_dimid1(i)) )
+            call check( nf90_put_att(ncid, varid(i), "desc",  desc_dimid1(i)) )
+         end do
+         do i = 1, len_dimid2
+            call check( nf90_put_att(ncid, varid(i+len_dimid1), "units", unit_dimid2(i)) )
+            call check( nf90_put_att(ncid, varid(i+len_dimid1), "desc",  desc_dimid2(i)) )
+         end do
+
+         ! Add global attribute
+         call check( nf90_put_att(ncid, NF90_GLOBAL, "Created_by", "Jian Sun @ CISL/NCAR") )
+         call date_and_time(date)
+         call check( nf90_put_att(ncid, NF90_GLOBAL, "Created_date", date) )
+
+         ! End define mode. This tells netCDF we are done defining metadata.
+         call check( nf90_enddef(ncid) )
+
+         ! Close the file. This frees up any internal netCDF resources
+         ! associated with the file, and flushes any buffers.
+         call check( nf90_close(ncid) )
+
+      end if   ! if masterproc
+
+   end if      ! if first time step
 
    itim_old = pbuf_old_tim_idx()
 
@@ -3651,6 +3759,110 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    ! ptend_loc is deallocated in physics_update above
    call physics_state_dealloc(state_loc)
 
+   if (is_first_step()) then
+
+      ! output fields for KGen input, use masterproc only
+      if (masterproc) then
+
+         ! open an existing netcdf file
+         call check( nf90_open(FILE_NAME, NF90_WRITE, ncid) )
+
+         call check( nf90_inq_varid(ncid, "packed_t", var_id) )
+         call check( nf90_put_var(ncid, var_id, packed_t) )
+
+         call check( nf90_inq_varid(ncid, "packed_q", var_id) )
+         call check( nf90_put_var(ncid, var_id, packed_q) )
+
+         call check( nf90_inq_varid(ncid, "packed_qc", var_id) )
+         call check( nf90_put_var(ncid, var_id, packed_qc) )
+
+         call check( nf90_inq_varid(ncid, "packed_nc", var_id) )
+         call check( nf90_put_var(ncid, var_id, packed_nc) )
+
+         call check( nf90_inq_varid(ncid, "packed_qi", var_id) )
+         call check( nf90_put_var(ncid, var_id, packed_qi) )
+
+         call check( nf90_inq_varid(ncid, "packed_ni", var_id) )
+         call check( nf90_put_var(ncid, var_id, packed_ni) )
+
+         call check( nf90_inq_varid(ncid, "packed_qr", var_id) )
+         call check( nf90_put_var(ncid, var_id, packed_qr) )
+
+         call check( nf90_inq_varid(ncid, "packed_qs", var_id) )
+         call check( nf90_put_var(ncid, var_id, packed_qs) )
+
+         call check( nf90_inq_varid(ncid, "packed_nr", var_id) )
+         call check( nf90_put_var(ncid, var_id, packed_nr) )
+
+         call check( nf90_inq_varid(ncid, "packed_ns", var_id) )
+         call check( nf90_put_var(ncid, var_id, packed_ns) )
+
+         call check( nf90_inq_varid(ncid, "packed_qg", var_id) )
+         call check( nf90_put_var(ncid, var_id, packed_qg) )
+
+         call check( nf90_inq_varid(ncid, "packed_ng", var_id) )
+         call check( nf90_put_var(ncid, var_id, packed_ng) )
+
+         call check( nf90_inq_varid(ncid, "packed_relvar", var_id) )
+         call check( nf90_put_var(ncid, var_id, packed_relvar) )
+
+         call check( nf90_inq_varid(ncid, "packed_accre_enhan", var_id) )
+         call check( nf90_put_var(ncid, var_id, packed_accre_enhan) )
+
+         call check( nf90_inq_varid(ncid, "packed_p", var_id) )
+         call check( nf90_put_var(ncid, var_id, packed_p) )
+
+         call check( nf90_inq_varid(ncid, "packed_pdel", var_id) )
+         call check( nf90_put_var(ncid, var_id, packed_pdel) )
+
+         call check( nf90_inq_varid(ncid, "packed_cldn", var_id) )
+         call check( nf90_put_var(ncid, var_id, packed_cldn) )
+
+         call check( nf90_inq_varid(ncid, "packed_liqcldf", var_id) )
+         call check( nf90_put_var(ncid, var_id, packed_liqcldf) )
+
+         call check( nf90_inq_varid(ncid, "packed_icecldf", var_id) )
+         call check( nf90_put_var(ncid, var_id, packed_icecldf) )
+
+         call check( nf90_inq_varid(ncid, "packed_qsatfac", var_id) )
+         call check( nf90_put_var(ncid, var_id, packed_qsatfac) )
+
+         call check( nf90_inq_varid(ncid, "packed_naai", var_id) )
+         call check( nf90_put_var(ncid, var_id, packed_naai) )
+
+         call check( nf90_inq_varid(ncid, "packed_npccn", var_id) )
+         call check( nf90_put_var(ncid, var_id, packed_npccn) )
+
+         call check( nf90_inq_varid(ncid, "packed_tnd_qsnow", var_id) )
+         call check( nf90_put_var(ncid, var_id, packed_tnd_qsnow) )
+
+         call check( nf90_inq_varid(ncid, "packed_tnd_nsnow", var_id) )
+         call check( nf90_put_var(ncid, var_id, packed_tnd_nsnow) )
+
+         call check( nf90_inq_varid(ncid, "packed_re_ice", var_id) )
+         call check( nf90_put_var(ncid, var_id, packed_re_ice) )
+
+         call check( nf90_inq_varid(ncid, "packed_frzimm", var_id) )
+         call check( nf90_put_var(ncid, var_id, packed_frzimm) )
+
+         call check( nf90_inq_varid(ncid, "packed_frzcnt", var_id) )
+         call check( nf90_put_var(ncid, var_id, packed_frzcnt) )
+
+         call check( nf90_inq_varid(ncid, "packed_frzdep", var_id) )
+         call check( nf90_put_var(ncid, var_id, packed_frzdep) )
+
+         call check( nf90_inq_varid(ncid, "packed_rndst", var_id) )
+         call check( nf90_put_var(ncid, var_id, packed_rndst) )
+
+         call check( nf90_inq_varid(ncid, "packed_nacon", var_id) )
+         call check( nf90_put_var(ncid, var_id, packed_nacon) )
+
+         call check( nf90_close(ncid) )
+
+      end if  ! if masterproc
+
+   end if     ! if is first time step
+
 #if defined (__OPENACC__)
    deallocate(icimrst_subgrid,rei_subgrid,niic_subgrid)
 #endif
@@ -3739,5 +3951,17 @@ function p2(tin) result(pout)
   real(r8), pointer :: pout(:,:)
   pout => tin
 end function p2
+
+! check netcdf error
+subroutine check(status)
+  use netcdf
+
+  integer, intent(in) :: status
+
+  if(status /= nf90_noerr) then
+     print *, trim(nf90_strerror(status))
+     stop "Stopped"
+  end if
+end subroutine check
 
 end module micro_mg_cam
