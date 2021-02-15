@@ -943,7 +943,7 @@ subroutine micro_mg_tend ( &
 !$acc declare copyin (nccons,nicons,ngcons,ncnst,ninst,ngnst,dcs,g,r,rv,cpp,   &
 !$acc                 xxlv,xlf,microp_uniform,do_cldice,use_hetfrz_classnuc,   &
 !$acc                 do_hail,do_graupel,rhosu,icenuct,snowmelt,rainfrze,xxls, &
-!$acc                 tmelt,rhmini,xxlv_squared,xxls_squared,do_sb_physics,    &
+!$acc                 tmelt,xxlv_squared,xxls_squared,do_sb_physics,    &
 !$acc                 gamma_br_plus4,gamma_bs_plus1,gamma_bs_plus4,            &
 !$acc                 gamma_bi_plus4,gamma_bj_plus1,gamma_bj_plus4,            &
 !$acc                 gamma_br_plus1,gamma_bi_plus1,gamma_bg_plus4,            &

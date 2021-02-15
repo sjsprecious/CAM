@@ -344,7 +344,8 @@ subroutine micro_mg_utils_init( kind, rair, rh2o, cpair, tmelt_in, latvap, &
 
   ! Mean ice diameter can not grow bigger than twice the autoconversion
   ! threshold for snow.
-  ice_lambda_bounds = 1._r8/[2._r8*dcs, 1.e-6_r8]
+  ice_lambda_bounds(1) = 1._r8/2._r8*dcs
+  ice_lambda_bounds(2) = 1._r8/1.e-6_r8
 
   mg_ice_props = MGHydrometeorProps(rhoi, dsph, &
        ice_lambda_bounds, min_mean_mass_ice)
@@ -409,10 +410,10 @@ subroutine rising_factorial_r8_vec(x, n, res,vlen)
   real(r8) :: tmp(vlen)
 
 #if defined(__OPENACC__)
-  !$acc data present (x,res) &
-  !$acc      create  (tmp)
+!!  !$acc data present (x,res) &
+!!  !$acc      create  (tmp)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN)
   !$acc loop gang vector
   do i=1,vlen
      tmp(i) = x(i)+n
@@ -422,7 +423,7 @@ subroutine rising_factorial_r8_vec(x, n, res,vlen)
   end do
   !$acc end parallel
 
-  !$acc end data
+!!  !$acc end data
 #else
   tmp = x+n
   res = gamma(tmp)
@@ -467,10 +468,10 @@ subroutine rising_factorial_integer_vec(x, n, res,vlen)
   integer  :: i,j
   real(r8) :: factor(vlen)
 
-  !$acc data present (x,res) &
-  !$acc      create  (factor)
+!!  !$acc data present (x,res) &
+!!  !$acc      create  (factor)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN)
   !$acc loop gang vector
   do i=1,vlen
      res(i)    = 1._r8
@@ -505,7 +506,7 @@ subroutine rising_factorial_integer_vec(x, n, res,vlen)
   end if
   !$acc end parallel
 
-  !$acc end data
+!!  !$acc end data
 end subroutine rising_factorial_integer_vec
 
 ! Calculate correction due to latent heat for evaporation/sublimation
@@ -625,10 +626,10 @@ subroutine size_dist_param_liq_vect(props, qcic, ncic, rho, pgam, lamc, vlen)
   real(r8) :: tmp(vlen),pgamp1(vlen)
   real(r8) :: shapeC(vlen),lbnd(vlen),ubnd(vlen)
 
-  !$acc data present (props,qcic,ncic,rho,pgam,lamc) &
-  !$acc      create  (tmp,pgamp1,shapeC,lbnd,ubnd)
+!!  !$acc data present (props,qcic,ncic,rho,pgam,lamc) &
+!!  !$acc      create  (tmp,pgamp1,shapeC,lbnd,ubnd)
 
-    !$acc parallel vector_length(VLEN) default(present)
+    !$acc parallel vector_length(VLEN)
     !$acc loop gang vector
     do i=1,vlen
        if (qcic(i) > qsmall) then
@@ -650,7 +651,7 @@ subroutine size_dist_param_liq_vect(props, qcic, ncic, rho, pgam, lamc, vlen)
        call rising_factorial(pgamp1, props%eff_dim,tmp,vlen)
     end if
 
-    !$acc parallel vector_length(VLEN) default(present)
+    !$acc parallel vector_length(VLEN)
     !$acc loop gang vector
     do i=1,vlen
        if (qcic(i) > qsmall) then
@@ -664,7 +665,7 @@ subroutine size_dist_param_liq_vect(props, qcic, ncic, rho, pgam, lamc, vlen)
 
     call size_dist_param_basic(props, qcic, ncic, shapeC, lbnd, ubnd, lamc, vlen)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN)
   !$acc loop gang vector
   do i=1,vlen
      if (qcic(i) <= qsmall) then
@@ -677,7 +678,7 @@ subroutine size_dist_param_liq_vect(props, qcic, ncic, rho, pgam, lamc, vlen)
   end do
   !$acc end parallel
 
-  !$acc end data
+!!  !$acc end data
 end subroutine size_dist_param_liq_vect
 
 ! Basic routine for getting size distribution parameters.
@@ -735,7 +736,7 @@ subroutine size_dist_param_basic_vect(props, qic, nic, lam, vlen, n0)
   logical  :: limiterActive, present_n0
   real(r8) :: effDim,shapeCoef,ubnd,lbnd, minMass
 
-  !$acc data present (props,qic,nic,lam,n0)
+!!  !$acc data present (props,qic,nic,lam,n0)
 
   limiterActive = limiter_is_on(props%min_mean_mass)
   effDim    = props%eff_dim
@@ -745,7 +746,7 @@ subroutine size_dist_param_basic_vect(props, qic, nic, lam, vlen, n0)
   minMass   = props%min_mean_mass
   present_n0 = present(n0)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN)
   !$acc loop gang vector 
   do i=1,vlen
 
@@ -784,7 +785,7 @@ subroutine size_dist_param_basic_vect(props, qic, nic, lam, vlen, n0)
   end if
   !$acc end parallel
 
-  !$acc end data
+!!  !$acc end data
 end subroutine size_dist_param_basic_vect
 
 subroutine size_dist_param_basic_vect2(props, qic, nic, shapeC,lbnd,ubnd, lam, vlen, n0)
@@ -806,9 +807,9 @@ subroutine size_dist_param_basic_vect2(props, qic, nic, shapeC,lbnd,ubnd, lam, v
   minMass       = props%min_mean_mass
   present_n0    = present(n0)
 
-  !$acc data present (props,qic,nic,shapeC,lbnd,ubnd,lam,n0)
+!!  !$acc data present (props,qic,nic,shapeC,lbnd,ubnd,lam,n0)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN)
   !$acc loop gang vector
   do i=1,vlen
 
@@ -846,7 +847,7 @@ subroutine size_dist_param_basic_vect2(props, qic, nic, shapeC,lbnd,ubnd, lam, v
   end if
   !$acc end parallel
 
-  !$acc end data
+!!  !$acc end data
 end subroutine size_dist_param_basic_vect2
 
 real(r8) elemental function avg_diameter(q, n, rho_air, rho_sub)

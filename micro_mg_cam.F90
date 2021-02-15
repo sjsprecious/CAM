@@ -1,67 +1,69 @@
-module micro_mg_cam
 
+
+module micro_mg_cam
 !---------------------------------------------------------------------------------
-!
 !  CAM Interfaces for MG microphysics
-!
 !---------------------------------------------------------------------------------
-!
 ! How to add new packed MG inputs to micro_mg_cam_tend:
-!
 ! If you have an input with first dimension [psetcols, pver], the procedure
 ! for adding inputs is as follows:
-!
 ! 1) In addition to any variables you need to declare for the "unpacked"
 !    (CAM format) version, you must declare an array for the "packed" 
 !    (MG format) version.
-!
 ! 2) Add a call similar to the following line (look before the
 !    micro_mg_tend calls to see similar lines):
-!
 !      packed_array = packer%pack(original_array)
-!
 !    The packed array can then be passed into any of the MG schemes.
-!
 ! This same procedure will also work for 1D arrays of size psetcols, 3-D
 ! arrays with psetcols and pver as the first dimensions, and for arrays of
 ! dimension [psetcols, pverp]. You only have to modify the allocation of
 ! the packed array before the "pack" call.
-!
 !---------------------------------------------------------------------------------
-!
 ! How to add new packed MG outputs to micro_mg_cam_tend:
-!
 ! 1) As with inputs, in addition to the unpacked outputs you must declare
 !    an array for packed data. The unpacked and packed arrays must *also* 
 !    be targets or pointers (but cannot be both).
-!
 ! 2) Add the field to post-processing as in the following line (again,
 !    there are many examples before the micro_mg_tend calls):
-!
 !      call post_proc%add_field(p(final_array),p(packed_array))
-!  
 !    *** IMPORTANT ** If the fields are only being passed to a certain version of
 !    MG, you must only add them if that version is being called (see
 !    the "if (micro_mg_version >1)" sections below
-!
 !    This registers the field for post-MG averaging, and to scatter to the
 !    final, unpacked version of the array.
-!
 !    By default, any columns/levels that are not operated on by MG will be
 !    set to 0 on output; this value can be adjusted using the "fillvalue"
 !    optional argument to post_proc%add_field.
-!
 !    Also by default, outputs from multiple substeps will be averaged after
 !    MG's substepping is complete. Passing the optional argument
 !    "accum_method=accum_null" will change this behavior so that the last
 !    substep is always output.
-!
 ! This procedure works on 1-D and 2-D outputs. Note that the final,
 ! unpacked arrays are not set until the call to
 ! "post_proc%process_and_unpack", which sets every single field that was
 ! added with post_proc%add_field.
-!
 !---------------------------------------------------------------------------------
+
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!  
+!
+!
+!
+!
+!
 
 use shr_kind_mod,   only: r8=>shr_kind_r8
 use spmd_utils,     only: masterproc
@@ -129,14 +131,14 @@ logical, public :: do_cldice ! Prognose cldice flag
 integer :: num_steps ! Number of MG substeps
 
 integer :: ncnst = 4       ! Number of constituents
-
 ! Namelist variables for option to specify constant cloud droplet/ice number
+
 logical :: micro_mg_nccons = .false. ! set .true. to specify constant cloud droplet number
 logical :: micro_mg_nicons = .false. ! set .true. to specify constant cloud ice number
 logical :: micro_mg_ngcons = .false. ! set .true. to specify constant graupel/hail number
-
 ! parameters for specified ice and droplet number concentration
 ! note: these are local in-cloud values, not grid-mean
+
 real(r8) :: micro_mg_ncnst = 100.e6_r8 ! constant droplet num concentration (m-3)
 real(r8) :: micro_mg_ninst = 0.1e6_r8  ! constant ice num concentration (m-3)
 real(r8) :: micro_mg_ngnst = 0.1e6_r8  ! constant graupel/hail num concentration (m-3)
@@ -159,8 +161,8 @@ integer :: &
    ixnumsnow = -1,     &! snow number index
    ixgraupel = -1,     &! graupel index
    ixnumgraupel = -1   ! graupel number index
-
 ! Physics buffer indices for fields registered by this module
+
 integer :: &
    cldo_idx,           &
    qme_idx,            &
@@ -189,47 +191,47 @@ integer :: &
    relvar_idx,         &
    cmeliq_idx,         &
    accre_enhan_idx
-
 ! Fields for UNICON
+
 integer :: &
      am_evp_st_idx,      &! Evaporation area of stratiform precipitation
      evprain_st_idx,     &! Evaporation rate of stratiform rain [kg/kg/s]. >= 0.
      evpsnow_st_idx       ! Evaporation rate of stratiform snow [kg/kg/s]. >= 0.
-
 ! Fields needed as inputs to COSP
+
 integer :: &
      ls_mrprc_idx,    ls_mrsnw_idx,    &
      ls_reffrain_idx, ls_reffsnow_idx, &
      cv_reffliq_idx,  cv_reffice_idx
-
 ! Fields needed by Park macrophysics
+
 integer :: &
      cc_t_idx,  cc_qv_idx, &
      cc_ql_idx, cc_qi_idx, &
      cc_nl_idx, cc_ni_idx, &
      cc_qlst_idx
-
 ! Used to replace aspects of MG microphysics
 ! (e.g. by CARMA)
+
 integer :: &
      tnd_qsnow_idx = -1, &
      tnd_nsnow_idx = -1, &
      re_ice_idx = -1
-
 ! Index fields for precipitation efficiency.
+
 integer :: &
      acpr_idx = -1, &
      acgcme_idx = -1, &
      acnum_idx = -1
-
 ! Physics buffer indices for fields registered by other modules
+
 integer :: &
    ast_idx = -1,            &
    cld_idx = -1,            &
    concld_idx = -1,         &
    qsatfac_idx = -1
-
 ! Pbuf fields needed for subcol_SILHS
+
 integer :: &
      qrain_idx=-1, qsnow_idx=-1,    &
      nrain_idx=-1, nsnow_idx=-1,    &
@@ -251,8 +253,8 @@ integer :: &
    snow_pcw_idx = -1,       &
    prec_sed_idx = -1,       &
    snow_sed_idx = -1
-
 ! pbuf fields for heterogeneous freezing
+
 integer :: &
    frzimm_idx = -1, &
    frzcnt_idx = -1, &
@@ -267,9 +269,9 @@ interface p
    module procedure p1
    module procedure p2
 end interface p
-
-
 !===============================================================================
+
+
 contains
 !===============================================================================
 
@@ -281,14 +283,14 @@ subroutine micro_mg_cam_readnl(nlfile)
                              mpi_logical, mpi_character
 
   character(len=*), intent(in) :: nlfile  ! filepath for file containing namelist input
-
   ! Namelist variables
+
   logical :: micro_mg_do_cldice = .true. ! do_cldice = .true., MG microphysics is prognosing cldice
   logical :: micro_mg_do_cldliq = .true. ! do_cldliq = .true., MG microphysics is prognosing cldliq
   integer :: micro_mg_num_steps = 1      ! Number of substepping iterations done by MG (1.5 only for now).
-
-
   ! Local variables
+
+
   integer :: unitn, ierr
   character(len=*), parameter :: sub = 'micro_mg_cam_readnl'
 
@@ -299,8 +301,8 @@ subroutine micro_mg_cam_readnl(nlfile)
        micro_mg_do_hail, micro_mg_do_graupel,micro_mg_ngcons, micro_mg_ngnst,&
        micro_mg_nccons, micro_mg_nicons, micro_mg_ncnst, micro_mg_ninst,&
        micro_do_massless_droplet_destroyer
-
   !-----------------------------------------------------------------------------
+
 
   if (masterproc) then
      unitn = getunit()
@@ -314,13 +316,13 @@ subroutine micro_mg_cam_readnl(nlfile)
      end if
      close(unitn)
      call freeunit(unitn)
-
      ! set local variables
+
      do_cldice = micro_mg_do_cldice
      do_cldliq = micro_mg_do_cldliq
      num_steps = micro_mg_num_steps
-
      ! Verify that version numbers are valid.
+
      select case (micro_mg_version)
      case (1)
         select case (micro_mg_sub_version)
@@ -367,8 +369,8 @@ subroutine micro_mg_cam_readnl(nlfile)
      end if
 
   end if
-
   ! Broadcast namelist variables
+
   call mpi_bcast(micro_mg_version, 1, mpi_integer, mstrid, mpicom, ierr)
   if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: micro_mg_version")
 
@@ -465,21 +467,21 @@ contains
   end subroutine bad_version_endrun
 
 end subroutine micro_mg_cam_readnl
-
 !================================================================================================
 
-subroutine micro_mg_cam_register
 
+subroutine micro_mg_cam_register
    ! Register microphysics constituents and fields in the physics buffer.
    !-----------------------------------------------------------------------
+
 
    logical :: prog_modal_aero
    logical :: use_subcol_microp  ! If true, then are using subcolumns in microphysics
 
    call phys_getopts(use_subcol_microp_out    = use_subcol_microp, &
                      prog_modal_aero_out      = prog_modal_aero)
-
    ! Register microphysics constituents and save indices.
+
 
    call cnst_add(cnst_names(1), mwh2o, cpair, 0._r8, ixcldliq, &
       longname='Grid box averaged cloud liquid amount', is_convtran1=.true.)
@@ -490,8 +492,8 @@ subroutine micro_mg_cam_register
       longname='Grid box averaged cloud liquid number', is_convtran1=.true.)
    call cnst_add(cnst_names(4), mwh2o, cpair, 0._r8, ixnumice, &
       longname='Grid box averaged cloud ice number', is_convtran1=.true.)
-
    ! Note is_convtran1 is set to .true.
+
    if (micro_mg_version > 1) then
       call cnst_add(cnst_names(5), mwh2o, cpair, 0._r8, ixrain, &
            longname='Grid box averaged rain amount', is_convtran1=.true.)
@@ -509,12 +511,12 @@ subroutine micro_mg_cam_register
          call cnst_add(cnst_names(10), mwh2o, cpair, 0._r8, ixnumgraupel, &
               longname='Grid box averaged graupel/hail number', is_convtran1=.true.)
    end if
-
    ! Request physics buffer space for fields that persist across timesteps.
 
-   call pbuf_add_field('CLDO','global',dtype_r8,(/pcols,pver,dyn_time_lvls/), cldo_idx)
 
+   call pbuf_add_field('CLDO','global',dtype_r8,(/pcols,pver,dyn_time_lvls/), cldo_idx)
    ! Physics buffer variables for convective cloud properties.
+
 
    call pbuf_add_field('QME',        'physpkg',dtype_r8,(/pcols,pver/), qme_idx)
    call pbuf_add_field('PRAIN',      'physpkg',dtype_r8,(/pcols,pver/), prain_idx)
@@ -528,20 +530,20 @@ subroutine micro_mg_cam_register
    call pbuf_add_field('SADICE',     'physpkg',dtype_r8,(/pcols,pver/), sadice_idx)
    call pbuf_add_field('SADSNOW',    'physpkg',dtype_r8,(/pcols,pver/), sadsnow_idx)
    call pbuf_add_field('REL',        'physpkg',dtype_r8,(/pcols,pver/), rel_idx)
-
    ! Mitchell ice effective diameter for radiation
+
    call pbuf_add_field('DEI',        'physpkg',dtype_r8,(/pcols,pver/), dei_idx)
    ! Size distribution shape parameter for radiation
    call pbuf_add_field('MU',         'physpkg',dtype_r8,(/pcols,pver/), mu_idx)
    ! Size distribution shape parameter for radiation
    call pbuf_add_field('LAMBDAC',    'physpkg',dtype_r8,(/pcols,pver/), lambdac_idx)
-
    ! Stratiform only in cloud ice water path for radiation
+
    call pbuf_add_field('ICIWPST',    'physpkg',dtype_r8,(/pcols,pver/), iciwpst_idx)
    ! Stratiform in cloud liquid water path for radiation
    call pbuf_add_field('ICLWPST',    'physpkg',dtype_r8,(/pcols,pver/), iclwpst_idx)
-
    ! Snow effective diameter for radiation
+
    call pbuf_add_field('DES',        'physpkg',dtype_r8,(/pcols,pver/), des_idx)
    ! In cloud snow water path for radiation
    call pbuf_add_field('ICSWP',      'physpkg',dtype_r8,(/pcols,pver/), icswp_idx)
@@ -563,17 +565,17 @@ subroutine micro_mg_cam_register
 
    call pbuf_add_field('LS_FLXPRC',  'physpkg',dtype_r8,(/pcols,pverp/), ls_flxprc_idx)
    call pbuf_add_field('LS_FLXSNW',  'physpkg',dtype_r8,(/pcols,pverp/), ls_flxsnw_idx)
-
-
    ! Fields needed as inputs to COSP
+
+
    call pbuf_add_field('LS_MRPRC',   'physpkg',dtype_r8,(/pcols,pver/), ls_mrprc_idx)
    call pbuf_add_field('LS_MRSNW',   'physpkg',dtype_r8,(/pcols,pver/), ls_mrsnw_idx)
    call pbuf_add_field('LS_REFFRAIN','physpkg',dtype_r8,(/pcols,pver/), ls_reffrain_idx)
    call pbuf_add_field('LS_REFFSNOW','physpkg',dtype_r8,(/pcols,pver/), ls_reffsnow_idx)
    call pbuf_add_field('CV_REFFLIQ', 'physpkg',dtype_r8,(/pcols,pver/), cv_reffliq_idx)
    call pbuf_add_field('CV_REFFICE', 'physpkg',dtype_r8,(/pcols,pver/), cv_reffice_idx)
-
    ! CC_* Fields needed by Park macrophysics
+
    call pbuf_add_field('CC_T',     'global',  dtype_r8, (/pcols,pver,dyn_time_lvls/), cc_t_idx)
    call pbuf_add_field('CC_qv',    'global',  dtype_r8, (/pcols,pver,dyn_time_lvls/), cc_qv_idx)
    call pbuf_add_field('CC_ql',    'global',  dtype_r8, (/pcols,pver,dyn_time_lvls/), cc_ql_idx)
@@ -581,18 +583,18 @@ subroutine micro_mg_cam_register
    call pbuf_add_field('CC_nl',    'global',  dtype_r8, (/pcols,pver,dyn_time_lvls/), cc_nl_idx)
    call pbuf_add_field('CC_ni',    'global',  dtype_r8, (/pcols,pver,dyn_time_lvls/), cc_ni_idx)
    call pbuf_add_field('CC_qlst',  'global',  dtype_r8, (/pcols,pver,dyn_time_lvls/), cc_qlst_idx)
-
    ! Fields for UNICON
+
    call pbuf_add_field('am_evp_st',  'global', dtype_r8, (/pcols,pver/), am_evp_st_idx)
    call pbuf_add_field('evprain_st', 'global', dtype_r8, (/pcols,pver/), evprain_st_idx)
    call pbuf_add_field('evpsnow_st', 'global', dtype_r8, (/pcols,pver/), evpsnow_st_idx)
-
    ! Register subcolumn pbuf fields
+
    if (use_subcol_microp) then
       ! Global pbuf fields
       call pbuf_register_subcol('CLDO',        'micro_mg_cam_register', cldo_idx)
-
       ! CC_* Fields needed by Park macrophysics
+
       call pbuf_register_subcol('CC_T',        'micro_mg_cam_register', cc_t_idx)
       call pbuf_register_subcol('CC_qv',       'micro_mg_cam_register', cc_qv_idx)
       call pbuf_register_subcol('CC_ql',       'micro_mg_cam_register', cc_ql_idx)
@@ -600,9 +602,9 @@ subroutine micro_mg_cam_register
       call pbuf_register_subcol('CC_nl',       'micro_mg_cam_register', cc_nl_idx)
       call pbuf_register_subcol('CC_ni',       'micro_mg_cam_register', cc_ni_idx)
       call pbuf_register_subcol('CC_qlst',     'micro_mg_cam_register', cc_qlst_idx)
-
       ! Physpkg pbuf fields
       ! Physics buffer variables for convective cloud properties.
+
 
       call pbuf_register_subcol('QME',         'micro_mg_cam_register', qme_idx)
       call pbuf_register_subcol('PRAIN',       'micro_mg_cam_register', prain_idx)
@@ -616,20 +618,20 @@ subroutine micro_mg_cam_register
       call pbuf_register_subcol('SADICE',      'micro_mg_cam_register', sadice_idx)
       call pbuf_register_subcol('SADSNOW',     'micro_mg_cam_register', sadsnow_idx)
       call pbuf_register_subcol('REL',         'micro_mg_cam_register', rel_idx)
-
       ! Mitchell ice effective diameter for radiation
+
       call pbuf_register_subcol('DEI',         'micro_mg_cam_register', dei_idx)
       ! Size distribution shape parameter for radiation
       call pbuf_register_subcol('MU',          'micro_mg_cam_register', mu_idx)
       ! Size distribution shape parameter for radiation
       call pbuf_register_subcol('LAMBDAC',     'micro_mg_cam_register', lambdac_idx)
-
       ! Stratiform only in cloud ice water path for radiation
+
       call pbuf_register_subcol('ICIWPST',     'micro_mg_cam_register', iciwpst_idx)
       ! Stratiform in cloud liquid water path for radiation
       call pbuf_register_subcol('ICLWPST',     'micro_mg_cam_register', iclwpst_idx)
-
       ! Snow effective diameter for radiation
+
       call pbuf_register_subcol('DES',         'micro_mg_cam_register', des_idx)
       ! In cloud snow water path for radiation
       call pbuf_register_subcol('ICSWP',       'micro_mg_cam_register', icswp_idx)
@@ -651,8 +653,8 @@ subroutine micro_mg_cam_register
 
       call pbuf_register_subcol('LS_FLXPRC',   'micro_mg_cam_register', ls_flxprc_idx)
       call pbuf_register_subcol('LS_FLXSNW',   'micro_mg_cam_register', ls_flxsnw_idx)
-
       ! Fields needed as inputs to COSP
+
       call pbuf_register_subcol('LS_MRPRC',    'micro_mg_cam_register', ls_mrprc_idx)
       call pbuf_register_subcol('LS_MRSNW',    'micro_mg_cam_register', ls_mrsnw_idx)
       call pbuf_register_subcol('LS_REFFRAIN', 'micro_mg_cam_register', ls_reffrain_idx)
@@ -660,24 +662,24 @@ subroutine micro_mg_cam_register
       call pbuf_register_subcol('CV_REFFLIQ',  'micro_mg_cam_register', cv_reffliq_idx)
       call pbuf_register_subcol('CV_REFFICE',  'micro_mg_cam_register', cv_reffice_idx)
    end if
-
    ! Additional pbuf for CARMA interface
+
    if (.not. do_cldice) then
       call pbuf_add_field('TND_QSNOW',  'physpkg',dtype_r8,(/pcols,pver/), tnd_qsnow_idx)
       call pbuf_add_field('TND_NSNOW',  'physpkg',dtype_r8,(/pcols,pver/), tnd_nsnow_idx)
       call pbuf_add_field('RE_ICE',     'physpkg',dtype_r8,(/pcols,pver/), re_ice_idx)
    end if
-
    ! Precipitation efficiency fields across timesteps.
+
    call pbuf_add_field('ACPRECL',    'global',dtype_r8,(/pcols/), acpr_idx)   ! accumulated precip
    call pbuf_add_field('ACGCME',     'global',dtype_r8,(/pcols/), acgcme_idx) ! accumulated condensation
    call pbuf_add_field('ACNUM',      'global',dtype_i4,(/pcols/), acnum_idx)  ! counter for accumulated # timesteps
-
    ! SGS variability  -- These could be reset by CLUBB so they need to be grid only
+
    call pbuf_add_field('RELVAR',     'global',dtype_r8,(/pcols,pver/), relvar_idx)
    call pbuf_add_field('ACCRE_ENHAN','global',dtype_r8,(/pcols,pver/), accre_enhan_idx)
-
    ! Diagnostic fields needed for subcol_SILHS, need to be grid-only
+
    if (subcol_get_scheme() == 'SILHS') then
       call pbuf_add_field('QRAIN',   'global',dtype_r8,(/pcols,pver/), qrain_idx)
       call pbuf_add_field('QSNOW',   'global',dtype_r8,(/pcols,pver/), qsnow_idx)
@@ -705,29 +707,29 @@ subroutine micro_mg_cam_register
    end if
 
 end subroutine micro_mg_cam_register
-
 !===============================================================================
 
-function micro_mg_cam_implements_cnst(name)
 
+function micro_mg_cam_implements_cnst(name)
    ! Return true if specified constituent is implemented by the
    ! microphysics package
 
+
    character(len=*), intent(in) :: name        ! constituent name
    logical :: micro_mg_cam_implements_cnst    ! return value
-
    !-----------------------------------------------------------------------
+
 
    micro_mg_cam_implements_cnst = any(name == cnst_names)
 
 end function micro_mg_cam_implements_cnst
-
 !===============================================================================
 
-subroutine micro_mg_cam_init_cnst(name, latvals, lonvals, mask, q)
 
+subroutine micro_mg_cam_init_cnst(name, latvals, lonvals, mask, q)
    ! Initialize the microphysics constituents, if they are
    ! not read from the initial file.
+
 
    character(len=*), intent(in)  :: name       ! constituent name
    real(r8),         intent(in)  :: latvals(:) ! lat in degrees (ncol)
@@ -746,20 +748,20 @@ subroutine micro_mg_cam_init_cnst(name, latvals, lonvals, mask, q)
    end if
 
 end subroutine micro_mg_cam_init_cnst
-
 !===============================================================================
+
 
 subroutine micro_mg_cam_init(pbuf2d)
    use time_manager,   only: is_first_step
    use micro_mg_utils, only: micro_mg_utils_init
    use micro_mg1_0, only: micro_mg_init1_0 => micro_mg_init
    use micro_mg3_0, only: micro_mg_init3_0 => micro_mg_init
-
    !-----------------------------------------------------------------------
-   !
    ! Initialization for MG microphysics
-   !
    !-----------------------------------------------------------------------
+
+   !
+   !
 
    type(physics_buffer_desc), pointer :: pbuf2d(:,:)
 
@@ -773,8 +775,8 @@ subroutine micro_mg_cam_init(pbuf2d)
    integer :: budget_histfile      ! output history file number for budget fields
    integer :: ierr
    character(128) :: errstring     ! return status (non-blank for error return)
-
    !-----------------------------------------------------------------------
+
 
    call phys_getopts(use_subcol_microp_out=use_subcol_microp, &
                      do_clubb_sgs_out     =do_clubb_sgs)
@@ -837,8 +839,8 @@ subroutine micro_mg_cam_init(pbuf2d)
    end select
 
    call handle_errmsg(errstring, subname="micro_mg_init")
-
    ! Register history variables
+
    do m = 1, ncnst
       call cnst_get_ind(cnst_names(m), mm)
       if ( any(mm == (/ ixcldliq, ixcldice, ixrain, ixsnow, ixgraupel /)) ) then
@@ -881,8 +883,8 @@ subroutine micro_mg_cam_init(pbuf2d)
    call addfld ('CLDFSNOW',   (/ 'lev' /), 'A', '1',        'Cloud fraction adjusted for snow'                        )
    call addfld ('ICWMRST',    (/ 'lev' /), 'A', 'kg/kg',    'Prognostic in-stratus water mixing ratio'                )
    call addfld ('ICIMRST',    (/ 'lev' /), 'A', 'kg/kg',    'Prognostic in-stratus ice mixing ratio'                  )
-
    ! MG microphysics diagnostics
+
    call addfld ('QCSEVAP',    (/ 'lev' /), 'A', 'kg/kg/s',  'Rate of evaporation of falling cloud water'              )
    call addfld ('QISEVAP',    (/ 'lev' /), 'A', 'kg/kg/s',  'Rate of sublimation of falling cloud ice'                )
    call addfld ('QVRES',      (/ 'lev' /), 'A', 'kg/kg/s',  'Rate of residual condensation term'                      )
@@ -938,8 +940,8 @@ subroutine micro_mg_cam_init(pbuf2d)
          call addfld ('CLDFGRAU',   (/ 'lev' /), 'A', '1',        'Cloud fraction adjusted for graupel'                        )
 
    end if
-
    ! History variables for CAM5 microphysics
+
    call addfld ('MPDT',       (/ 'lev' /), 'A', 'W/kg',     'Heating tendency - Morrison microphysics'                )
    call addfld ('MPDQ',       (/ 'lev' /), 'A', 'kg/kg/s',  'Q tendency - Morrison microphysics'                      )
    call addfld ('MPDLIQ',     (/ 'lev' /), 'A', 'kg/kg/s',  'CLDLIQ tendency - Morrison microphysics'                 )
@@ -960,9 +962,9 @@ subroutine micro_mg_cam_init(pbuf2d)
         &in-cloud Initial Liquid WP (Before Micro)' )
    call addfld ('MPICIWPI',   horiz_only,  'A', 'kg/m2',    'Vertically-integrated &
         &in-cloud Initial Ice WP (Before Micro)'    )
-
    ! This is provided as an example on how to write out subcolumn output
    ! NOTE -- only 'I' should be used for sub-column fields as subc-columns could shift from time-step to time-step
+
    if (use_subcol_microp) then
       call addfld('FICE_SCOL', (/'psubcols','lev     '/), 'I', 'fraction', &
            'Sub-column fractional ice content within cloud', flag_xyfill=.true., fill_value=1.e30_r8)
@@ -971,19 +973,19 @@ subroutine micro_mg_cam_init(pbuf2d)
       call addfld('MPDLIQ_SCOL', (/'psubcols','lev     '/), 'I', 'kg/kg/s', &
            'Sub-column CLDLIQ tendency - Morrison microphysics', flag_xyfill=.true., fill_value=1.e30_r8)
    end if
-   
-   
    ! This is only if the coldpoint temperatures are being adjusted.
    ! NOTE: Some fields related to these and output later are added in tropopause.F90.
+   
+   
    if (micro_mg_adjust_cpt) then
      call addfld ('TROPF_TADJ', (/ 'lev' /), 'A', 'K',  'Temperatures after cold point adjustment'                    )
      call addfld ('TROPF_RHADJ', (/ 'lev' /), 'A', 'K', 'Relative Hunidity after cold point adjustment'               )
      call addfld ('TROPF_CDT',   horiz_only,  'A', 'K',  'Cold point temperature adjustment'                           )
      call addfld ('TROPF_CDZ',   horiz_only,  'A', 'm',  'Distance of coldpoint from coldest model level'              )
    end if
-
-
    ! Averaging for cloud particle number and size
+
+
    call addfld ('AWNC',        (/ 'lev' /),  'A', 'm-3',      'Average cloud water number conc'                                   )
    call addfld ('AWNI',        (/ 'lev' /),  'A', 'm-3',      'Average cloud ice number conc'                                     )
    call addfld ('AREL',        (/ 'lev' /),  'A', 'Micron',   'Average droplet effective radius'                                  )
@@ -991,8 +993,8 @@ subroutine micro_mg_cam_init(pbuf2d)
    ! Frequency arrays for above
    call addfld ('FREQL',       (/ 'lev' /),  'A', 'fraction', 'Fractional occurrence of liquid'                                   )
    call addfld ('FREQI',       (/ 'lev' /),  'A', 'fraction', 'Fractional occurrence of ice'                                      )
-
    ! Average cloud top particle size and number (liq, ice) and frequency
+
    call addfld ('ACTREL',      horiz_only,   'A', 'Micron',   'Average Cloud Top droplet effective radius'                        )
    call addfld ('ACTREI',      horiz_only,   'A', 'Micron',   'Average Cloud Top ice effective radius'                            )
    call addfld ('ACTNL',       horiz_only,   'A', 'm-3',   'Average Cloud Top droplet number'                                  )
@@ -1000,8 +1002,8 @@ subroutine micro_mg_cam_init(pbuf2d)
 
    call addfld ('FCTL',        horiz_only,   'A', 'fraction', 'Fractional occurrence of cloud top liquid'                         )
    call addfld ('FCTI',        horiz_only,   'A', 'fraction', 'Fractional occurrence of cloud top ice'                            )
-
    ! New frequency arrays for mixed phase and supercooled liquid (only and mixed) for (a) Cloud Top and (b) everywhere..
+
    call addfld ('FREQM',       (/ 'lev' /),  'A', 'fraction', 'Fractional occurrence of mixed phase'                              )
    call addfld ('FREQSL',      (/ 'lev' /),  'A', 'fraction', 'Fractional occurrence of only supercooled liquid'                  )
    call addfld ('FREQSLM',     (/ 'lev' /),  'A', 'fraction', 'Fractional occurrence of super cooled liquid with ice'             )
@@ -1020,18 +1022,18 @@ subroutine micro_mg_cam_init(pbuf2d)
    call addfld ('CV_REFFICE',  (/ 'lev' /),  'A', 'micron',   'convective cloud ice effective radius'                             )
    call addfld ('MG_SADICE',   (/ 'lev' /),  'A', 'cm2/cm3',  'MG surface area density ice'                                       )
    call addfld ('MG_SADSNOW',  (/ 'lev' /),  'A', 'cm2/cm3',  'MG surface area density snow'                                       )
-
    ! diagnostic precip
+
    call addfld ('QRAIN',       (/ 'lev' /),  'A', 'kg/kg',    'Diagnostic grid-mean rain mixing ratio'                            )
    call addfld ('QSNOW',       (/ 'lev' /),  'A', 'kg/kg',    'Diagnostic grid-mean snow mixing ratio'                            )
    call addfld ('NRAIN',       (/ 'lev' /),  'A', 'm-3',      'Diagnostic grid-mean rain number conc'                             )
    call addfld ('NSNOW',       (/ 'lev' /),  'A', 'm-3',      'Diagnostic grid-mean snow number conc'                             )
-
    ! size of precip
+
    call addfld ('RERCLD',      (/ 'lev' /),  'A', 'm',         'Diagnostic effective radius of Liquid Cloud and Rain'             )
    call addfld ('DSNOW',       (/ 'lev' /),  'A', 'm',         'Diagnostic grid-mean snow diameter'                               )
-
    ! diagnostic radar reflectivity, cloud-averaged
+
    call addfld ('REFL',        (/ 'lev' /),  'A', 'DBz',      '94 GHz radar reflectivity'                                         )
    call addfld ('AREFL',       (/ 'lev' /),  'A', 'DBz',      'Average 94 GHz radar reflectivity'                                 )
    call addfld ('FREFL',       (/ 'lev' /),  'A', 'fraction', 'Fractional occurrence of radar reflectivity'                       )
@@ -1041,12 +1043,12 @@ subroutine micro_mg_cam_init(pbuf2d)
    call addfld ('FCSRFL',      (/ 'lev' /),  'A', 'fraction', 'Fractional occurrence of radar reflectivity (CloudSat thresholds)' )
 
    call addfld ('AREFLZ',      (/ 'lev' /),  'A', 'mm^6/m^3', 'Average 94 GHz radar reflectivity'                                 )
-
    ! Aerosol information
+
    call addfld ('NCAL',        (/ 'lev' /),  'A', '1/m3',     'Number Concentation Activated for Liquid'                          )
    call addfld ('NCAI',        (/ 'lev' /),  'A', '1/m3',     'Number Concentation Activated for Ice'                             )
-
    ! Average rain and snow mixing ratio (Q), number (N) and diameter (D), with frequency
+
    call addfld ('AQRAIN',      (/ 'lev' /),  'A', 'kg/kg',    'Average rain mixing ratio'                                         )
    call addfld ('AQSNOW',      (/ 'lev' /),  'A', 'kg/kg',    'Average snow mixing ratio'                                         )
    call addfld ('ANRAIN',      (/ 'lev' /),  'A', 'm-3',      'Average rain number conc'                                          )
@@ -1055,8 +1057,8 @@ subroutine micro_mg_cam_init(pbuf2d)
    call addfld ('ADSNOW',      (/ 'lev' /),  'A', 'm',        'Average snow effective Diameter'                                   )
    call addfld ('FREQR',       (/ 'lev' /),  'A', 'fraction', 'Fractional occurrence of rain'                                     )
    call addfld ('FREQS',       (/ 'lev' /),  'A', 'fraction', 'Fractional occurrence of snow'                                     )
-
    ! precipitation efficiency & other diagnostic fields
+
    call addfld('PE'    ,       horiz_only,   'A', '1',        'Stratiform Precipitation Efficiency  (precip/cmeliq)'              )
    call addfld('APRL'  ,       horiz_only,   'A', 'm/s',      'Average Stratiform Precip Rate over efficiency calculation'        )
    call addfld('PEFRAC',       horiz_only,   'A', '1',        'Fraction of timesteps precip efficiency reported'                  )
@@ -1076,14 +1078,14 @@ subroutine micro_mg_cam_init(pbuf2d)
       call addfld ('AQGRAU',      (/ 'lev' /),  'A', 'kg/kg',    'Average graupel/hail mixing ratio'              )
       call addfld ('ANGRAU',      (/ 'lev' /),  'A', 'm-3',      'Average graupel/hail number conc'               )
    end if
+   ! qc limiter (only output in versions 1.5 and later)
 
    
-   ! qc limiter (only output in versions 1.5 and later)
    if (.not. (micro_mg_version == 1 .and. micro_mg_sub_version == 0)) then
       call addfld('QCRAT', (/ 'lev' /), 'A', 'fraction', 'Qc Limiter: Fraction of qc tendency applied')
    end if
-
    ! determine the add_default fields
+
    call phys_getopts(history_amwg_out           = history_amwg         , &
                      history_budget_out         = history_budget       , &
                      history_budget_histfile_num_out = budget_histfile)
@@ -1186,8 +1188,8 @@ subroutine micro_mg_cam_init(pbuf2d)
       end if
 
    end if
-
    ! physics buffer indices
+
    ast_idx      = pbuf_get_index('AST')
    cld_idx      = pbuf_get_index('CLD')
    concld_idx   = pbuf_get_index('CONCLD')
@@ -1206,20 +1208,20 @@ subroutine micro_mg_cam_init(pbuf2d)
    snow_pcw_idx = pbuf_get_index('SNOW_PCW')
 
    cmeliq_idx = pbuf_get_index('CMELIQ')
-
    ! These fields may have been added, so don't abort if they have not been
+
    qsatfac_idx  = pbuf_get_index('QSATFAC', ierr)
    qrain_idx    = pbuf_get_index('QRAIN', ierr)
    qsnow_idx    = pbuf_get_index('QSNOW', ierr)
    nrain_idx    = pbuf_get_index('NRAIN', ierr)
    nsnow_idx    = pbuf_get_index('NSNOW', ierr)
-
   ! fields for heterogeneous freezing
+
   frzimm_idx = pbuf_get_index('FRZIMM', ierr)
   frzcnt_idx = pbuf_get_index('FRZCNT', ierr)
   frzdep_idx = pbuf_get_index('FRZDEP', ierr)
-
   ! Initialize physics buffer grid fields for accumulating precip and condensation
+
    if (is_first_step()) then
       call pbuf_set_field(pbuf2d, cldo_idx,   0._r8)
       call pbuf_set_field(pbuf2d, cc_t_idx,   0._r8)
@@ -1254,8 +1256,8 @@ subroutine micro_mg_cam_init(pbuf2d)
       if (ums_idx > 0)        call pbuf_set_field(pbuf2d, ums_idx, 0._r8)
       if (qcsevap_idx > 0)    call pbuf_set_field(pbuf2d, qcsevap_idx, 0._r8)
       if (qisevap_idx > 0)    call pbuf_set_field(pbuf2d, qisevap_idx, 0._r8)
-
       ! If sub-columns turned on, need to set the sub-column fields as well
+
       if (use_subcol_microp) then
          call pbuf_set_field(pbuf2d, cldo_idx,   0._r8, col_type=col_type_subcol)
          call pbuf_set_field(pbuf2d, cc_t_idx,   0._r8, col_type=col_type_subcol)
@@ -1270,8 +1272,8 @@ subroutine micro_mg_cam_init(pbuf2d)
    end if
 
 end subroutine micro_mg_cam_init
-
 !===============================================================================
+
 
 subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf)
 
@@ -1282,12 +1284,12 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf)
    type(physics_ptend),         intent(out)   :: ptend
    real(r8),                    intent(in)    :: dtime
    type(physics_buffer_desc),   pointer       :: pbuf(:)
-
    ! Local variables
+
    integer :: ncol, nlev, mgncol
    integer, allocatable :: mgcols(:) ! Columns with microphysics performed
-
    ! Find the number of levels used in the microphysics.
+
    nlev  = pver - top_lev + 1 
    ncol  = state%ncol
    
@@ -1328,8 +1330,6 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    use tropopause,      only: tropopause_find, TROP_ALG_CPP, TROP_ALG_NONE, NOTFOUND
    use wv_saturation,   only: qsat
 
-   use perf_mod
-
    type(physics_state),         intent(in)    :: state
    type(physics_ptend),         intent(out)   :: ptend
    real(r8),                    intent(in)    :: dtime
@@ -1338,8 +1338,8 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    integer, intent(in) :: nlev
    integer, intent(in) :: mgncol
    integer, intent(in) :: mgcols(:)
-
    ! Local variables
+
    integer :: lchnk, ncol, psetcols, ngrdcol
 
    integer :: i, k, itim_old, it
@@ -1486,11 +1486,11 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    real(r8), target :: nmultgo(state%psetcols,pver) 
    real(r8), target :: nmultrgo(state%psetcols,pver) 
    real(r8), target :: npsacwgo(state%psetcols,pver) 
-
    ! Object that packs columns with clouds/precip.
-   type(MGPacker) :: packer
 
+   type(MGPacker) :: packer
    ! Packed versions of inputs.
+
    real(r8) :: packed_t(mgncol,nlev)
    real(r8) :: packed_q(mgncol,nlev)
    real(r8) :: packed_qc(mgncol,nlev)
@@ -1520,8 +1520,8 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
 
    real(r8), allocatable :: packed_rndst(:,:,:)
    real(r8), allocatable :: packed_nacon(:,:,:)
-
    ! Optional outputs.
+
    real(r8) :: packed_tnd_qsnow(mgncol,nlev)
    real(r8) :: packed_tnd_nsnow(mgncol,nlev)
    real(r8) :: packed_re_ice(mgncol,nlev)
@@ -1529,11 +1529,11 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    real(r8) :: packed_frzimm(mgncol,nlev)
    real(r8) :: packed_frzcnt(mgncol,nlev)
    real(r8) :: packed_frzdep(mgncol,nlev)
-
    ! Output field post-processing.
-   type(MGPostProc) :: post_proc
 
+   type(MGPostProc) :: post_proc
    ! Packed versions of outputs.
+
    real(r8), target :: packed_rate1ord_cw2pr_st(mgncol,nlev)
    real(r8), target :: packed_tlat(mgncol,nlev)
    real(r8), target :: packed_qvlat(mgncol,nlev)
@@ -1629,8 +1629,8 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    real(r8), target :: packed_mu(mgncol,nlev)
    real(r8), target :: packed_des(mgncol,nlev)
    real(r8), target :: packed_dei(mgncol,nlev)
-
 !Hail/Graupel Output
+
    real(r8), target :: packed_qgout(mgncol,nlev)   
    real(r8), target :: packed_ngout(mgncol,nlev)   
    real(r8), target :: packed_dgout(mgncol,nlev)                  
@@ -1652,21 +1652,21 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    real(r8), target :: packed_nmultg(mgncol,nlev)
    real(r8), target :: packed_nmultrg(mgncol,nlev)
    real(r8), target :: packed_npsacwg(mgncol,nlev)
-
    ! Dummy arrays for cases where we throw away the MG version and
    ! recalculate sizes on the CAM grid to avoid time/subcolumn averaging
    ! issues.
+
    real(r8) :: rel_fn_dum(mgncol,nlev)
    real(r8) :: dsout2_dum(mgncol,nlev)
    real(r8) :: drout_dum(mgncol,nlev)
    real(r8) :: reff_rain_dum(mgncol,nlev)
    real(r8) :: reff_snow_dum(mgncol,nlev)
    real(r8) :: reff_grau_dum(mgncol,nlev)   !not used for now or passed to COSP.
-
    ! Heterogeneous-only version of mnuccdo.
-   real(r8) :: mnuccdohet(state%psetcols,pver)
 
+   real(r8) :: mnuccdohet(state%psetcols,pver)
    ! physics buffer fields for COSP simulator
+
    real(r8), pointer :: mgflxprc(:,:)     ! MG grid-box mean flux_large_scale_cloud_rain+snow at interfaces (kg/m2/s)
    real(r8), pointer :: mgflxsnw(:,:)     ! MG grid-box mean flux_large_scale_cloud_snow at interfaces (kg/m2/s)
    real(r8), pointer :: mgmrprc(:,:)      ! MG grid-box mean mixingratio_large_scale_cloud_rain+snow at interfaces (kg/kg)
@@ -1675,8 +1675,8 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    real(r8), pointer :: mgreffsnow_grid(:,:)   ! MG diagnostic snow effective radius (um)
    real(r8), pointer :: cvreffliq(:,:)    ! convective cloud liquid effective radius (um)
    real(r8), pointer :: cvreffice(:,:)    ! convective cloud ice effective radius (um)
-
    ! physics buffer fields used with CARMA
+
    real(r8), pointer, dimension(:,:) :: tnd_qsnow    ! external tendency on snow mass (kg/kg/s)
    real(r8), pointer, dimension(:,:) :: tnd_nsnow    ! external tendency on snow number(#/kg/s)
    real(r8), pointer, dimension(:,:) :: re_ice       ! ice effective radius (m)
@@ -1693,15 +1693,15 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    real(r8), pointer :: CC_nl(:,:)        ! Grid-mean microphysical tendency
    real(r8), pointer :: CC_ni(:,:)        ! Grid-mean microphysical tendency
    real(r8), pointer :: CC_qlst(:,:)      ! In-liquid stratus microphysical tendency
-
    ! variables for heterogeneous freezing
+
    real(r8), pointer :: frzimm(:,:)
    real(r8), pointer :: frzcnt(:,:)
    real(r8), pointer :: frzdep(:,:)
 
    real(r8), pointer :: qme(:,:)
-
    ! A local copy of state is used for diagnostic calculations
+
    type(physics_state) :: state_loc
    type(physics_ptend) :: ptend_loc
 
@@ -1733,16 +1733,16 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
 
    real(r8) :: iclwpi(state%psetcols)       ! Vertically-integrated in-cloud Liquid WP before microphysics
    real(r8) :: iciwpi(state%psetcols)       ! Vertically-integrated in-cloud Ice WP before microphysics
-
    ! Averaging arrays for effective radius and number....
+
    real(r8) :: efiout_grid(pcols,pver)
    real(r8) :: efcout_grid(pcols,pver)
    real(r8) :: ncout_grid(pcols,pver)
    real(r8) :: niout_grid(pcols,pver)
    real(r8) :: freqi_grid(pcols,pver)
    real(r8) :: freql_grid(pcols,pver)
-
 !  Averaging arrays for supercooled liquid
+
    real(r8) :: freqm_grid(pcols,pver)
    real(r8) :: freqsl_grid(pcols,pver)
    real(r8) :: freqslm_grid(pcols,pver)
@@ -1753,11 +1753,11 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    real(r8) :: cdnumc_grid(pcols)           ! Vertically-integrated droplet concentration
    real(r8) :: icimrst_grid_out(pcols,pver) ! In stratus ice mixing ratio
    real(r8) :: icwmrst_grid_out(pcols,pver) ! In stratus water mixing ratio
-
    ! Cloud fraction used for precipitation.
-   real(r8) :: cldmax_grid(pcols,pver)
 
+   real(r8) :: cldmax_grid(pcols,pver)
    ! Average cloud top radius & number
+
    real(r8) :: ctrel_grid(pcols)
    real(r8) :: ctrei_grid(pcols)
    real(r8) :: ctnl_grid(pcols)
@@ -1766,23 +1766,23 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    real(r8) :: fctl_grid(pcols)
 
    real(r8) :: ftem_grid(pcols,pver)
-
    ! Variables for precip efficiency calculation
+
    real(r8) :: minlwp        ! LWP threshold
 
    real(r8), pointer, dimension(:) :: acprecl_grid ! accumulated precip across timesteps
    real(r8), pointer, dimension(:) :: acgcme_grid  ! accumulated condensation across timesteps
    integer,  pointer, dimension(:) :: acnum_grid   ! counter for # timesteps accumulated
-
    ! Variables for liquid water path and column condensation
+
    real(r8) :: tgliqwp_grid(pcols)   ! column liquid
    real(r8) :: tgcmeliq_grid(pcols)  ! column condensation rate (units)
 
    real(r8) :: pe_grid(pcols)        ! precip efficiency for output
    real(r8) :: pefrac_grid(pcols)    ! fraction of time precip efficiency is written out
    real(r8) :: tpr_grid(pcols)       ! average accumulated precipitation rate in pe calculation
-
    ! variables for autoconversion and accretion vertical averages
+
    real(r8) :: vprco_grid(pcols)     ! vertical average autoconversion
    real(r8) :: vprao_grid(pcols)     ! vertical average accretion
    real(r8) :: racau_grid(pcols)     ! ratio of vertical averages
@@ -1940,46 +1940,50 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    integer :: col_type ! Flag to store whether accessing grid or sub-columns in pbuf_get_field
 
    character(128) :: errstring   ! return status (non-blank for error return)
-
    ! For rrtmg optics. specified distribution.
+
    real(r8), parameter :: dcon   = 25.e-6_r8         ! Convective size distribution effective radius (meters)
    real(r8), parameter :: mucon  = 5.3_r8            ! Convective size distribution shape parameter
    real(r8), parameter :: deicon = 50._r8            ! Convective ice effective diameter (meters)
 
    real(r8), pointer :: pckdptr(:,:)
 
-#if defined (__OPENACC__)
    real(r8), dimension(:,:), allocatable :: icimrst_subgrid, rei_subgrid, &
                                             niic_subgrid, icwmrst_subgrid, &
                                             ncic_subgrid, rho_subgrid, &
                                             mu_subgrid, lambdac_subgrid
-#endif
-
    !-------------------------------------------------------------------------------
+   CHARACTER(LEN=4096) :: datapath 
+   INTEGER :: ierror 
+   REAL(KIND=8), DIMENSION(0:2) :: kgen_timer 
+   INTEGER, SAVE :: kgen_invokes = 0 
+   INTEGER*8 :: kgen_start_clock, kgen_stop_clock, kgen_rate_clock 
+   INTEGER :: dataunit 
+   CHARACTER(LEN=10) :: rankstr 
+   CHARACTER(LEN=6) :: threadstr 
+
 
    lchnk = state%lchnk
    ncol  = state%ncol
    psetcols = state%psetcols
    ngrdcol  = state%ngrdcol
 
-#if defined (__OPENACC__)
    allocate( icimrst_subgrid(ngrdcol,nlev-top_lev+1),rei_subgrid(ngrdcol,nlev-top_lev+1), &
              niic_subgrid(ngrdcol,nlev-top_lev+1),icwmrst_subgrid(ngrdcol,nlev-top_lev+1), &
              ncic_subgrid(ngrdcol,nlev-top_lev+1),rho_subgrid(ngrdcol,nlev-top_lev+1), &
              mu_subgrid(ngrdcol,nlev-top_lev+1),lambdac_subgrid(ngrdcol,nlev-top_lev+1) )
-#endif
 
    itim_old = pbuf_old_tim_idx()
 
    call phys_getopts(use_subcol_microp_out=use_subcol_microp)
-
    ! Set the col_type flag to grid or subcolumn dependent on the value of use_subcol_microp
-   call pbuf_col_type_index(use_subcol_microp, col_type=col_type)
 
+   call pbuf_col_type_index(use_subcol_microp, col_type=col_type)
    !-----------------------
    ! These physics buffer fields are read only and not set in this parameterization
    ! If these fields do not have subcolumn data, copy the grid to the subcolumn if subcolumns is turned on
    ! If subcolumns is not turned on, then these fields will be grid data
+
 
    call pbuf_get_field(pbuf, naai_idx,        naai,        col_type=col_type, copy_if_needed=use_subcol_microp)
    call pbuf_get_field(pbuf, naai_hom_idx,    naai_hom,    col_type=col_type, copy_if_needed=use_subcol_microp)
@@ -2010,10 +2014,10 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    end if
 
    if (qsatfac_idx > 0) call pbuf_get_field(pbuf, qsatfac_idx, qsatfac, col_type=col_type, copy_if_needed=use_subcol_microp)
-
    !-----------------------
    ! These physics buffer fields are calculated and set in this parameterization
    ! If subcolumns is turned on, then these fields will be calculated on a subcolumn grid, otherwise they will be a normal grid
+
 
    call pbuf_get_field(pbuf, prec_str_idx,    prec_str,    col_type=col_type)
    call pbuf_get_field(pbuf, snow_str_idx,    snow_str,    col_type=col_type)
@@ -2076,10 +2080,10 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    if (ums_idx > 0) call pbuf_get_field(pbuf, ums_idx, umsout_grid_ptr)
    if (qcsevap_idx > 0) call pbuf_get_field(pbuf, qcsevap_idx, qcsevapout_grid_ptr)
    if (qisevap_idx > 0) call pbuf_get_field(pbuf, qisevap_idx, qisevapout_grid_ptr)
-
    !-----------------------
    ! If subcolumns is turned on, all calculated fields which are on subcolumns
    ! need to be retrieved on the grid as well for storing averaged values
+
 
    if (use_subcol_microp) then
       call pbuf_get_field(pbuf, prec_str_idx,    prec_str_grid)
@@ -2129,9 +2133,9 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
       end if
 
    end if
-
    !-----------------------
    ! These are only on the grid regardless of whether subcolumns are turned on or not
+
    call pbuf_get_field(pbuf, ls_reffrain_idx, mgreffrain_grid)
    call pbuf_get_field(pbuf, ls_reffsnow_idx, mgreffsnow_grid)
    call pbuf_get_field(pbuf, acpr_idx,        acprecl_grid)
@@ -2143,14 +2147,14 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    call pbuf_get_field(pbuf, evprain_st_idx,  evprain_st_grid)
    call pbuf_get_field(pbuf, evpsnow_st_idx,  evpsnow_st_grid)
    call pbuf_get_field(pbuf, am_evp_st_idx,   am_evp_st_grid)
-   
    !-------------------------------------------------------------------------------------
    ! Microphysics assumes 'liquid stratus frac = ice stratus frac
    !                      = max( liquid stratus frac, ice stratus frac )'.
+   
    alst_mic => ast
    aist_mic => ast
-
    ! Output initial in-cloud LWP (before microphysics)
+
 
    iclwpi = 0._r8
    iciwpi = 0._r8
@@ -2167,14 +2171,14 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    end do
 
    cldo(:ncol,top_lev:pver)=ast(:ncol,top_lev:pver)
-
    ! Initialize local state from input.
-   call physics_state_copy(state, state_loc)
 
+   call physics_state_copy(state, state_loc)
    ! Because of the of limited vertical resolution, there can be a signifcant
    ! warm bias at the cold point tropopause, which can create a wet bias in the
    ! stratosphere. For the microphysics only, update the cold point temperature, with
    ! an estimate of the coldest point between the model layers.
+
    if (micro_mg_adjust_cpt) then
       cp_rh(:ncol, :pver)  = 0._r8
       cp_dt(:ncol)         = 0._r8
@@ -2184,28 +2188,28 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
                            tropZ=cp_z, tropT=cp_t)
 
       do i = 1, ncol
-
          ! Update statistics and output results.
+
          if (troplev(i) .ne. NOTFOUND) then
             cp_dt(i) = cp_t(i) - state_loc%t(i,troplev(i))
             cp_dz(i) = cp_z(i) - state_loc%zm(i,troplev(i))
-
             ! NOTE: This change in temperature is just for the microphysics
             ! and should not be added to any tendencies or used to update
             ! any states
+
             state_loc%t(i,troplev(i)) = state_loc%t(i,troplev(i)) + cp_dt(i)
          end if
       end do
-
       ! Output all of the statistics related to the cold point
       ! tropopause adjustment. Th cold point information itself is
       ! output in tropopause.F90.
+
       call outfld("TROPF_TADJ", state_loc%t, pcols, lchnk)
       call outfld("TROPF_CDT",  cp_dt,       pcols, lchnk)
       call outfld("TROPF_CDZ",  cp_dz,       pcols, lchnk)
    end if
-
    ! Initialize ptend for output.
+
    lq = .false.
    lq(1) = .true.
    lq(ixcldliq) = .true.
@@ -2222,9 +2226,9 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
       lq(ixgraupel) = .true.
       lq(ixnumgraupel) = .true.
    end if
-
    ! the name 'cldwat' triggers special tests on cldliq
    ! and cldice in physics_update
+
    call physics_ptend_init(ptend, psetcols, "cldwat", ls=.true., lq=lq)
 
    packer = MGPacker(psetcols, pver, mgcols, top_lev)
@@ -2347,10 +2351,10 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
       call post_proc%add_field(p(qmultgo), p(packed_qmultg))
       call post_proc%add_field(p(qmultrgo), p(packed_qmultrg))
    end if
-
    ! The following are all variables related to sizes, where it does not
    ! necessarily make sense to average over time steps. Instead, we keep
    ! the value from the last substep, which is what "accum_null" does.
+
    call post_proc%add_field(p(rel), p(packed_rel), &
         fillvalue=10._r8, accum_method=accum_null)
    call post_proc%add_field(p(rei), p(packed_rei), &
@@ -2369,8 +2373,8 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
         accum_method=accum_null)
    call post_proc%add_field(p(prer_evap), p(packed_prer_evap), &
         accum_method=accum_null)
-
    ! Pack input variables that are not updated during substeps.
+
    packed_relvar = packer%pack(relvar)
    packed_accre_enhan = packer%pack(accre_enhan)
 
@@ -2408,8 +2412,8 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    end if
 
    do it = 1, num_steps
-
       ! Pack input variables that are updated during substeps.
+
       packed_t = packer%pack(state_loc%t)
       packed_q = packer%pack(state_loc%q(:,:,1))
       packed_qc = packer%pack(state_loc%q(:,:,ixcldliq))
@@ -2464,7 +2468,16 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
 
          end select
       case(2:3)
-    call t_startf ('micro_mg3_tend')
+         !$kgen write packed_t, packed_q, packed_qc, packed_qi
+         !$kgen write packed_nc, packed_ni, packed_qr, packed_qs
+         !$kgen write packed_nr, packed_ns, packed_qg, packed_ng
+         !$kgen write packed_relvar, packed_accre_enhan
+         !$kgen write packed_p, packed_pdel, packed_cldn
+         !$kgen write packed_liqcldf, packed_icecldf, packed_qsatfac
+         !$kgen write packed_naai, packed_npccn, packed_rndst, packed_nacon
+         !$kgen begin_callsite mg3_tend 
+      kgen_invokes = kgen_invokes + 1 
+      CALL SYSTEM_CLOCK(kgen_start_clock, kgen_rate_clock) 
          call micro_mg_tend3_0( &
               mgncol,         nlev,           dtime/num_steps,&
               packed_t,               packed_q,               &
@@ -2532,15 +2545,31 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
               packed_tnd_qsnow,packed_tnd_nsnow,packed_re_ice,&
               packed_prer_evap,                                     &
               packed_frzimm,  packed_frzcnt,  packed_frzdep   )
-    call t_stopf ('micro_mg3_tend')
+         WRITE (rankstr, "(I1)") 0 
+         WRITE (threadstr, "(I1)") 0 
+         CALL SYSTEM_CLOCK(kgen_stop_clock, kgen_rate_clock) 
+         kgen_timer(0) = DBLE(kgen_start_clock) / DBLE(kgen_rate_clock) 
+         kgen_timer(1) = DBLE(kgen_stop_clock) / DBLE(kgen_rate_clock) 
+         kgen_timer(2) = 1.0 / DBLE(kgen_rate_clock) 
+         WRITE (datapath, *) "/glade/scratch/sunjian/MG3_KERNEL/model/__data__/1/" // TRIM(ADJUSTL(rankstr)) // "." // &
+         &TRIM(ADJUSTL(threadstr)) 
+         OPEN (NEWUNIT=dataunit, FILE=TRIM(ADJUSTL(datapath)), ACTION="WRITE", ACCESS="APPEND", IOSTAT=ierror) 
+         IF (ierror .EQ. 0) THEN 
+             WRITE (UNIT=dataunit, FMT="(I16,1X,ES34.16,1X,ES34.16,1X,ES34.16)") kgen_invokes, kgen_timer(0), kgen_timer(1), &
+             &kgen_timer(2) 
+             CLOSE (UNIT=dataunit) 
+         ELSE 
+             PRINT *, "FILE OPEN ERROR: ", TRIM(ADJUSTL(datapath)), ierror 
+         END IF   
+         !$kgen end_callsite mg3_tend
       end select
 
       call handle_errmsg(errstring, subname="micro_mg_tend")
 
       call physics_ptend_init(ptend_loc, psetcols, "micro_mg", &
                               ls=.true., lq=lq)
-
       ! Set local tendency.
+
       ptend_loc%s               = packer%unpack(packed_tlat, 0._r8)
       ptend_loc%q(:,:,1)        = packer%unpack(packed_qvlat, 0._r8)
       ptend_loc%q(:,:,ixcldliq) = packer%unpack(packed_qctend, 0._r8)
@@ -2572,28 +2601,28 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
          ptend_loc%q(:,:,ixnumgraupel) = packer%unpack(packed_ngtend, &
               -state_loc%q(:,:,ixnumgraupel)/(dtime/num_steps))
       end if
-
       ! Sum into overall ptend
+
       call physics_ptend_sum(ptend_loc, ptend, ncol)
-
       ! Update local state
-      call physics_update(state_loc, ptend_loc, dtime/num_steps)
 
+      call physics_update(state_loc, ptend_loc, dtime/num_steps)
       ! Sum all outputs for averaging.
+
       call post_proc%accumulate()
 
    end do
-
    ! Divide ptend by substeps.
-   call physics_ptend_scale(ptend, 1._r8/num_steps, ncol)
 
+   call physics_ptend_scale(ptend, 1._r8/num_steps, ncol)
    ! Use summed outputs to produce averages
+
    call post_proc%process_and_unpack()
 
    call post_proc%finalize()
-
    ! Check to make sure that the microphysics code is respecting the flags that control
    ! whether MG should be prognosing cloud ice and cloud liquid or not.
+
    if (.not. do_cldice) then
       if (any(ptend%q(:ncol,top_lev:pver,ixcldice) /= 0.0_r8)) &
            call endrun("micro_mg_cam:ERROR - MG microphysics is configured not to prognose cloud ice,"// &
@@ -2622,14 +2651,14 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
 
    mgflxprc(:ncol,top_lev:pverp) = rflx(:ncol,top_lev:pverp) + sflx(:ncol,top_lev:pverp)
    mgflxsnw(:ncol,top_lev:pverp) = sflx(:ncol,top_lev:pverp)
-
    !add condensate fluxes for MG2 (ice and snow already added for MG1)
+
    if (micro_mg_version >= 2) then
       mgflxprc(:ncol,top_lev:pverp) = mgflxprc(:ncol,top_lev:pverp)+ iflx(:ncol,top_lev:pverp) + cflx(:ncol,top_lev:pverp)
       mgflxsnw(:ncol,top_lev:pverp) = mgflxsnw(:ncol,top_lev:pverp) + iflx(:ncol,top_lev:pverp)
    end if
-
    !add graupel fluxes for MG3 to snow flux 
+
    if (micro_mg_version >= 3) then
       mgflxprc(:ncol,top_lev:pverp) = mgflxprc(:ncol,top_lev:pverp)+gflx(:ncol,top_lev:pverp)
       mgflxsnw(:ncol,top_lev:pverp) = mgflxsnw(:ncol,top_lev:pverp)+gflx(:ncol,top_lev:pverp)
@@ -2637,21 +2666,21 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
 
    mgmrprc(:ncol,top_lev:pver) = qrout(:ncol,top_lev:pver) + qsout(:ncol,top_lev:pver)
    mgmrsnw(:ncol,top_lev:pver) = qsout(:ncol,top_lev:pver)
-
    !! calculate effective radius of convective liquid and ice using dcon and deicon (not used by code, not useful for COSP)
    !! hard-coded as average of hard-coded values used for deep/shallow convective detrainment (near line 1502/1505)
+
    cvreffliq(:ncol,top_lev:pver) = 9.0_r8
    cvreffice(:ncol,top_lev:pver) = 37.0_r8
-
    ! Reassign rate1 if modal aerosols
+
    if (rate1_cw2pr_st_idx > 0) then
       rate1ord_cw2pr_st(:ncol,top_lev:pver) = rate1cld(:ncol,top_lev:pver)
    end if
-
    ! Sedimentation velocity for liquid stratus cloud droplet
-   wsedl(:ncol,top_lev:pver) = vtrmc(:ncol,top_lev:pver)
 
+   wsedl(:ncol,top_lev:pver) = vtrmc(:ncol,top_lev:pver)
    ! Microphysical tendencies for use in the macrophysics at the next time step
+
    CC_T(:ncol,top_lev:pver)    =  tlat(:ncol,top_lev:pver)/cpair
    CC_qv(:ncol,top_lev:pver)   = qvlat(:ncol,top_lev:pver)
    CC_ql(:ncol,top_lev:pver)   = qcten(:ncol,top_lev:pver)
@@ -2659,17 +2688,17 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    CC_nl(:ncol,top_lev:pver)   = ncten(:ncol,top_lev:pver)
    CC_ni(:ncol,top_lev:pver)   = niten(:ncol,top_lev:pver)
    CC_qlst(:ncol,top_lev:pver) = qcten(:ncol,top_lev:pver)/max(0.01_r8,alst_mic(:ncol,top_lev:pver))
-
    ! Net micro_mg_cam condensation rate
+
    qme(:ncol,:top_lev-1) = 0._r8
    qme(:ncol,top_lev:pver) = cmeliq(:ncol,top_lev:pver) + cmeiout(:ncol,top_lev:pver)
 
    bergso(:ncol,:top_lev-1) = 0._r8
-
    ! For precip, accumulate only total precip in prec_pcw and snow_pcw variables.
    ! Other precip output variables are set to 0
    ! Do not subscript by ncol here, because in physpkg we divide the whole
    ! array and need to avoid an FPE due to uninitialized data.
+
    prec_pcw = prect
    snow_pcw = preci
    prec_sed = 0._r8
@@ -2679,11 +2708,11 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
 
    icecldf(:ncol,top_lev:pver) = ast(:ncol,top_lev:pver)
    liqcldf(:ncol,top_lev:pver) = ast(:ncol,top_lev:pver)
-
    ! ------------------------------------------------------------ !
    ! Compute in cloud ice and liquid mixing ratios                !
    ! Note that 'iclwp, iciwp' are used for radiation computation. !
    ! ------------------------------------------------------------ !
+
 
    icinc = 0._r8
    icwnc = 0._r8
@@ -2710,10 +2739,10 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
          ! Note: uses stratiform cloud fraction!
          iciwpst(i,k)   = min(state_loc%q(i,k,ixcldice)/max(mincld,ast(i,k)),0.005_r8) * state_loc%pdel(i,k) / gravit
          iclwpst(i,k)   = min(state_loc%q(i,k,ixcldliq)/max(mincld,ast(i,k)),0.005_r8) * state_loc%pdel(i,k) / gravit
-
          ! ------------------------------ !
          ! Adjust cloud fraction for snow !
          ! ------------------------------ !
+
          cldfsnow(i,k) = cld(i,k)
          ! If cloud and only ice ( no convective cloud or ice ), then set to 0.
          if( ( cldfsnow(i,k) .gt. 1.e-4_r8 ) .and. &
@@ -2727,10 +2756,10 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
          end if
          ! Calculate in-cloud snow water path
          icswp(i,k) = qsout(i,k) / max( mincld, cldfsnow(i,k) ) * state_loc%pdel(i,k) / gravit
-
          ! --------------------------------- !
          ! Adjust cloud fraction for graupel !
          ! --------------------------------- !
+
        if (micro_mg_version > 2) then
           cldfgrau(i,k) = cld(i,k)
          ! If cloud and only ice ( no convective cloud or ice ), then set to 0.
@@ -2743,15 +2772,15 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
            if( ( cldfgrau(i,k) .le. 1.e-4_r8 ) .and. ( qgout(i,k) .gt. 1.e-9_r8 ) ) then
               cldfgrau(i,k) = 0.25_r8
            end if
-
          ! Calculate in-cloud snow water path
+
            icgrauwp(i,k) = qgout(i,k) / max( 1.e-2_r8, cldfgrau(i,k) ) * state_loc%pdel(i,k) / gravit 
         end if 
 
       end do
    end do
-
    ! Calculate cloud fraction for prognostic precip sizes.
+
    if (micro_mg_version > 1) then
       ! Cloud fraction for purposes of precipitation is maximum cloud
       ! fraction out of all the layers that the precipitation may be
@@ -2764,14 +2793,14 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
          end where
       end do
    end if
-
    ! ------------------------------------------------------ !
    ! ------------------------------------------------------ !
    ! All code from here to the end is on grid columns only  !
    ! ------------------------------------------------------ !
    ! ------------------------------------------------------ !
-
    ! Average the fields which are needed later in this paramterization to be on the grid
+
+
    if (use_subcol_microp) then
       call subcol_field_avg(prec_str,  ngrdcol, lchnk, prec_str_grid)
       call subcol_field_avg(iclwpst,   ngrdcol, lchnk, iclwpst_grid)
@@ -2786,8 +2815,8 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
       call subcol_field_avg(bergso,    ngrdcol, lchnk, bergso_grid)
 
       call subcol_field_avg(am_evp_st, ngrdcol, lchnk, am_evp_st_grid)
-
       ! Average fields which are not in pbuf
+
       call subcol_field_avg(qrout,     ngrdcol, lchnk, qrout_grid)
       call subcol_field_avg(qsout,     ngrdcol, lchnk, qsout_grid)
       call subcol_field_avg(nsout,     ngrdcol, lchnk, nsout_grid)
@@ -2869,8 +2898,8 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
       dei_grid        => dei
       des_grid        => des
       degrau_grid     => degrau
-
       ! fields already on grids, so just assign
+
       prec_str_grid   => prec_str
       iclwpst_grid    => iclwpst
       cvreffliq_grid  => cvreffliq
@@ -2934,8 +2963,8 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
          umrout_grid      = umr
          umsout_grid      = ums
       end if
-
 ! Zero out terms for budgets if not mg3....
+
       psacwgo_grid = 0._r8
       pgsacwo_grid = 0._r8
       qmultgo_grid = 0._r8
@@ -2961,9 +2990,9 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
 
 
    end if
-
    ! If on subcolumns, average the rest of the pbuf fields which were modified on subcolumns but are not used further in
    ! this parameterization  (no need to assign in the non-subcolumn case -- the else step)
+
    if (use_subcol_microp) then
       call subcol_field_avg(snow_str,    ngrdcol, lchnk, snow_str_grid)
       call subcol_field_avg(prec_pcw,    ngrdcol, lchnk, prec_pcw_grid)
@@ -2995,16 +3024,16 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
       end if
 
    end if
-
    ! ------------------------------------- !
    ! Size distribution calculation         !
    ! ------------------------------------- !
-
    ! Calculate rho (on subcolumns if turned on) for size distribution
    ! parameter calculations and average it if needed
-   !
    ! State instead of state_loc to preserve answers for MG1 (and in any
    ! case, it is unlikely to make much difference).
+
+
+   !
    rho(:ncol,top_lev:) = state%pmid(:ncol,top_lev:) / &
         (rair*state%t(:ncol,top_lev:))
    if (use_subcol_microp) then
@@ -3012,69 +3041,57 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    else
       rho_grid = rho
    end if
-
    ! Effective radius for cloud liquid, fixed number.
+
    mu_grid = 0._r8
    lambdac_grid = 0._r8
    rel_fn_grid = 10._r8
 
    ncic_grid = 1.e8_r8
 
-#if defined (__OPENACC__)
    icwmrst_subgrid(:,:) = icwmrst_grid(:ngrdcol,top_lev:)
    ncic_subgrid(:,:)    = ncic_grid(:ngrdcol,top_lev:)
    rho_subgrid(:,:)     = rho_grid(:ngrdcol,top_lev:)
    mu_subgrid(:,:)      = mu_grid(:ngrdcol,top_lev:)
    lambdac_subgrid(:,:) = lambdac_grid(:ngrdcol,top_lev:)
-   !$acc data copyin (mg_liq_props,icwmrst_subgrid,rho_subgrid) &
-   !$acc      copy   (ncic_subgrid,mu_subgrid,lambdac_subgrid)
+!!   !$acc data copyin (mg_liq_props,icwmrst_subgrid,rho_subgrid) &
+!!   !$acc      copy   (ncic_subgrid,mu_subgrid,lambdac_subgrid)
    call size_dist_param_liq_vect (mg_liq_props, icwmrst_subgrid, ncic_subgrid, rho_subgrid, &
                                   mu_subgrid, lambdac_subgrid, ngrdcol*(nlev-top_lev+1) )
-   !$acc end data
+!!   !$acc end data
    ncic_grid(:ngrdcol,top_lev:) = ncic_subgrid(:,:)
    mu_grid(:ngrdcol,top_lev:) = mu_subgrid(:,:)
    lambdac_grid(:ngrdcol,top_lev:) = lambdac_subgrid(:,:)
-#else
-   call size_dist_param_liq_vect(mg_liq_props, icwmrst_grid(:ngrdcol,top_lev:), &
-        ncic_grid(:ngrdcol,top_lev:), rho_grid(:ngrdcol,top_lev:), &
-        mu_grid(:ngrdcol,top_lev:), lambdac_grid(:ngrdcol,top_lev:), ngrdcol*(nlev-top_lev+1))
-#endif
 
    where (icwmrst_grid(:ngrdcol,top_lev:) > qsmall)
       rel_fn_grid(:ngrdcol,top_lev:) = &
            (mu_grid(:ngrdcol,top_lev:) + 3._r8)/ &
            lambdac_grid(:ngrdcol,top_lev:)/2._r8 * 1.e6_r8
    end where
-
    ! Effective radius for cloud liquid, and size parameters
    ! mu_grid and lambdac_grid.
+
    mu_grid = 0._r8
    lambdac_grid = 0._r8
    rel_grid = 10._r8
-
    ! Calculate ncic on the grid
+
    ncic_grid(:ngrdcol,top_lev:) = nc_grid(:ngrdcol,top_lev:) / &
         max(mincld,liqcldf_grid(:ngrdcol,top_lev:))
 
-#if defined (__OPENACC__)
    icwmrst_subgrid(:,:) = icwmrst_grid(:ngrdcol,top_lev:)
    ncic_subgrid(:,:)    = ncic_grid(:ngrdcol,top_lev:)
    rho_subgrid(:,:)     = rho_grid(:ngrdcol,top_lev:)
    mu_subgrid(:,:)      = mu_grid(:ngrdcol,top_lev:)
    lambdac_subgrid(:,:) = lambdac_grid(:ngrdcol,top_lev:)
-   !$acc data copyin (mg_liq_props,icwmrst_subgrid,rho_subgrid) &
-   !$acc      copy   (ncic_subgrid,mu_subgrid,lambdac_subgrid)
+!!   !$acc data copyin (mg_liq_props,icwmrst_subgrid,rho_subgrid) &
+!!   !$acc      copy   (ncic_subgrid,mu_subgrid,lambdac_subgrid)
    call size_dist_param_liq_vect (mg_liq_props, icwmrst_subgrid, ncic_subgrid, rho_subgrid, &
                                   mu_subgrid, lambdac_subgrid, ngrdcol*(nlev-top_lev+1) )
-   !$acc end data
+!!   !$acc end data
    ncic_grid(:ngrdcol,top_lev:) = ncic_subgrid(:,:)
    mu_grid(:ngrdcol,top_lev:) = mu_subgrid(:,:)
    lambdac_grid(:ngrdcol,top_lev:) = lambdac_subgrid(:,:)
-#else
-   call size_dist_param_liq_vect(mg_liq_props, icwmrst_grid(:ngrdcol,top_lev:), &
-        ncic_grid(:ngrdcol,top_lev:), rho_grid(:ngrdcol,top_lev:), &
-        mu_grid(:ngrdcol,top_lev:), lambdac_grid(:ngrdcol,top_lev:), ngrdcol*(nlev-top_lev+1))
-#endif
 
    where (icwmrst_grid(:ngrdcol,top_lev:) >= qsmall)
       rel_grid(:ngrdcol,top_lev:) = &
@@ -3085,8 +3102,8 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
       ! wherever there is no cloud.
       mu_grid(:ngrdcol,top_lev:) = 0._r8
    end where
-
    ! Rain/Snow effective diameter.
+
    drout2_grid = 0._r8
    reff_rain_grid = 0._r8
    des_grid = 0._r8
@@ -3147,8 +3164,8 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
       end where
 
    end if
-
 ! Graupel/Hail size distribution Placeholder
+
    if (micro_mg_version > 2) then
       degrau_grid = 0._r8
       where (qg_grid(:ngrdcol,top_lev:) >= 1.e-7_r8)
@@ -3163,29 +3180,23 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
               3._r8 * rhog/rhows
       end where
    end if
-
    ! Effective radius and diameter for cloud ice.
+
    rei_grid = 25._r8
 
    niic_grid(:ngrdcol,top_lev:) = ni_grid(:ngrdcol,top_lev:) / &
         max(mincld,icecldf_grid(:ngrdcol,top_lev:))
 
-#if defined (__OPENACC__)
    icimrst_subgrid(1:ngrdcol,top_lev:nlev) = icimrst_grid(1:ngrdcol,top_lev:nlev)
    niic_subgrid(1:ngrdcol,top_lev:nlev)    = niic_grid(1:ngrdcol,top_lev:nlev)
    rei_subgrid(1:ngrdcol,top_lev:nlev)     = rei_grid(1:ngrdcol,top_lev:nlev)
-   !$acc data copyin  (mg_ice_props,icimrst_subgrid(1:ngrdcol,top_lev:nlev)) &
-   !$acc      copy    (niic_subgrid(1:ngrdcol,top_lev:nlev)) &
-   !$acc      copyout (rei_subgrid(1:ngrdcol,top_lev:nlev))
+!!   !$acc data copyin  (mg_ice_props,icimrst_subgrid(1:ngrdcol,top_lev:nlev)) &
+!!   !$acc      copy    (niic_subgrid(1:ngrdcol,top_lev:nlev)) &
+!!   !$acc      copyout (rei_subgrid(1:ngrdcol,top_lev:nlev))
    call size_dist_param_basic_vect(mg_ice_props, icimrst_subgrid, niic_subgrid, &
                                    rei_subgrid, ngrdcol*(nlev-top_lev+1))
-   !$acc end data
+!!   !$acc end data
    rei_grid(1:ngrdcol,top_lev:nlev) = rei_subgrid(1:ngrdcol,top_lev:nlev)
-#else
-   call size_dist_param_basic_vect(mg_ice_props, icimrst_grid(1:ngrdcol,top_lev:), &
-                                   niic_grid(1:ngrdcol,top_lev:), rei_grid(1:ngrdcol,top_lev:), &
-                                   ngrdcol*(nlev-top_lev+1))
-#endif
 
    where (icimrst_grid(:ngrdcol,top_lev:) >= qsmall)
       rei_grid(:ngrdcol,top_lev:) = 1.5_r8/rei_grid(:ngrdcol,top_lev:) &
@@ -3195,8 +3206,8 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    end where
 
    dei_grid = rei_grid * rhoi/rhows * 2._r8
-
    ! Limiters for low cloud fraction.
+
    do k = top_lev, pver
       do i = 1, ngrdcol
          ! Convert snow effective diameter to microns
@@ -3211,15 +3222,14 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
 
    mgreffrain_grid(:ngrdcol,top_lev:pver) = reff_rain_grid(:ngrdcol,top_lev:pver)
    mgreffsnow_grid(:ngrdcol,top_lev:pver) = reff_snow_grid(:ngrdcol,top_lev:pver)
-
    ! ------------------------------------- !
    ! Precipitation efficiency Calculation  !
    ! ------------------------------------- !
-
    !-----------------------------------------------------------------------
    ! Liquid water path
-
    ! Compute liquid water paths, and column condensation
+
+
    tgliqwp_grid(:ngrdcol) = 0._r8
    tgcmeliq_grid(:ngrdcol) = 0._r8
    do k = top_lev, pver
@@ -3233,29 +3243,28 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
          end if
       end do
    end do
-
    ! note: 1e-6 kgho2/kgair/s * 1000. pa / (9.81 m/s2) / 1000 kgh2o/m3 = 1e-7 m/s
    ! this is 1ppmv of h2o in 10hpa
    ! alternatively: 0.1 mm/day * 1.e-4 m/mm * 1/86400 day/s = 1.e-9
-
    !-----------------------------------------------------------------------
    ! precipitation efficiency calculation  (accumulate cme and precip)
 
-   minlwp = 0.01_r8        !minimum lwp threshold (kg/m3)
 
+   minlwp = 0.01_r8        !minimum lwp threshold (kg/m3)
    ! zero out precip efficiency and total averaged precip
+
    pe_grid(:ngrdcol)     = 0._r8
    tpr_grid(:ngrdcol)    = 0._r8
    pefrac_grid(:ngrdcol) = 0._r8
-
    ! accumulate precip and condensation
+
    do i = 1, ngrdcol
 
       acgcme_grid(i)  = acgcme_grid(i) + tgcmeliq_grid(i)
       acprecl_grid(i) = acprecl_grid(i) + prec_str_grid(i)
       acnum_grid(i)   = acnum_grid(i) + 1
-
       ! if LWP is zero, then 'end of cloud': calculate precip efficiency
+
       if (tgliqwp_grid(i) < minlwp) then
          if (acprecl_grid(i) > 5.e-8_r8) then
             tpr_grid(i) = max(acprecl_grid(i)/acnum_grid(i), 1.e-15_r8)
@@ -3264,19 +3273,19 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
                pefrac_grid(i) = 1._r8
             end if
          end if
-
          ! reset counters
 !        if (pe_grid(i) /= 0._r8 .and. (pe_grid(i) < 1.e-8_r8 .or. pe_grid(i) > 1.e3_r8)) then
 !           write (iulog,*) 'PE_grid:ANOMALY  pe_grid, acprecl_grid, acgcme_grid, tpr_grid, acnum_grid ', &
 !                           pe_grid(i),acprecl_grid(i), acgcme_grid(i), tpr_grid(i), acnum_grid(i)
 !        endif
 
+
          acprecl_grid(i) = 0._r8
          acgcme_grid(i)  = 0._r8
          acnum_grid(i)   = 0
       end if               ! end LWP zero conditional
-
       ! if never find any rain....(after 10^3 timesteps...)
+
       if (acnum_grid(i) > 1000) then
          acnum_grid(i)   = 0
          acprecl_grid(i) = 0._r8
@@ -3284,10 +3293,10 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
       end if
 
    end do
-
    !-----------------------------------------------------------------------
    ! vertical average of non-zero accretion, autoconversion and ratio.
    ! vars: vprco_grid(i),vprao_grid(i),racau_grid(i),cnt_grid
+
 
    vprao_grid = 0._r8
    cnt_grid = 0
@@ -3313,16 +3322,16 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    end where
 
    racau_grid = min(racau_grid, 1.e10_r8)
-
    ! --------------------- !
    ! History Output Fields !
    ! --------------------- !
-
    ! Column droplet concentration
+
+
    cdnumc_grid(:ngrdcol) = sum(nc_grid(:ngrdcol,top_lev:pver) * &
         pdel_grid(:ngrdcol,top_lev:pver)/gravit, dim=2)
-
    ! Averaging for new output fields
+
    efcout_grid      = 0._r8
    efiout_grid      = 0._r8
    ncout_grid       = 0._r8
@@ -3349,8 +3358,8 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
             freqi_grid(i,k)  = icecldf_grid(i,k)
             icimrst_grid_out(i,k) = icimrst_grid(i,k)
          end if
-
          ! Supercooled liquid
+
          if (freql_grid(i,k) > 0.01_r8 .and. freqi_grid(i,k) > 0.01_r8 ) then
             freqm_grid(i,k)=min(liqcldf_grid(i,k),icecldf_grid(i,k))
          end if
@@ -3363,8 +3372,8 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
 
       end do
    end do
-
    ! Cloud top effective radius and number.
+
    fcti_grid  = 0._r8
    fctl_grid  = 0._r8
    ctrel_grid = 0._r8
@@ -3381,8 +3390,8 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
             ctrel_grid(i) = rel_grid(i,k) * liqcldf_grid(i,k)
             ctnl_grid(i)  = icwnc_grid(i,k) * liqcldf_grid(i,k)
             fctl_grid(i)  = liqcldf_grid(i,k)
-
             ! Cloud Top Mixed phase, supercooled liquid only and supercooled liquid mixed
+
             if (freqi_grid(i,k) > 0.01_r8) then
                fctm_grid(i)=min(liqcldf_grid(i,k),icecldf_grid(i,k))
             end if
@@ -3404,8 +3413,8 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
          end if
       end do
    end do
-
    ! Evaporation of stratiform precipitation fields for UNICON
+
    evprain_st_grid(:ngrdcol,:pver) = nevapr_grid(:ngrdcol,:pver) - evpsnow_st_grid(:ngrdcol,:pver)
    do k = top_lev, pver
       do i = 1, ngrdcol
@@ -3413,8 +3422,8 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
          evpsnow_st_grid(i,k) = max(evpsnow_st_grid(i,k), 0._r8)
       end do
    end do
-
    ! Assign the values to the pbuf pointers if they exist in pbuf
+
    if (qrain_idx > 0)  qrout_grid_ptr = qrout_grid
    if (qsnow_idx > 0)  qsout_grid_ptr = qsout_grid
    if (nrain_idx > 0)  nrout_grid_ptr = nrout_grid
@@ -3429,12 +3438,11 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    if (ums_idx > 0)      umsout_grid_ptr      = umsout_grid
    if (qcsevap_idx > 0 ) qcsevapout_grid_ptr  = qcsevapout_grid
    if (qisevap_idx > 0 ) qisevapout_grid_ptr  = qisevapout_grid
-
    ! --------------------------------------------- !
    ! General outfield calls for microphysics       !
    ! --------------------------------------------- !
-
    ! Output a handle of variables which are calculated on the fly
+
 
    ftem_grid = 0._r8
 
@@ -3475,8 +3483,8 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
 
    ftem_grid(:ngrdcol,top_lev:pver) = -prcio_grid(:ngrdcol,top_lev:pver) - praio_grid(:ngrdcol,top_lev:pver)
    call outfld( 'MPDI2P', ftem_grid, pcols, lchnk)
-
    ! Output fields which have not been averaged already, averaging if use_subcol_microp is true
+
    call outfld('MPICLWPI',    iclwpi,      psetcols, lchnk, avg_subcol_field=use_subcol_microp)
    call outfld('MPICIWPI',    iciwpi,      psetcols, lchnk, avg_subcol_field=use_subcol_microp)
    call outfld('REFL',        refl,        psetcols, lchnk, avg_subcol_field=use_subcol_microp)
@@ -3540,15 +3548,15 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
       call outfld('ANGRAU',      ngout2,      psetcols, lchnk, avg_subcol_field=use_subcol_microp)
       call outfld('CLDFGRAU',    cldfgrau,    psetcols, lchnk, avg_subcol_field=use_subcol_microp)
    end if
-
    ! Example subcolumn outfld call
+
    if (use_subcol_microp) then
       call outfld('FICE_SCOL',   nfice,       psubcols*pcols, lchnk)
       call outfld('MPDLIQ_SCOL', qcten,       psubcols*pcols, lchnk)
       call outfld('MPDICE_SCOL', qiten,       psubcols*pcols, lchnk)
    end if
-
    ! Output fields which are already on the grid
+
    call outfld('QRAIN',       qrout_grid,       pcols, lchnk)
    call outfld('QSNOW',       qsout_grid,       pcols, lchnk)
    call outfld('NRAIN',       nrout_grid,       pcols, lchnk)
@@ -3637,8 +3645,8 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
       cp_rh(:ncol, :pver)  = 0._r8
 
       do i = 1, ncol
-      
          ! Calculate the RH including any T change that we make.
+      
          do k = top_lev, pver 
            call qsat(state_loc%t(i,k), state_loc%pmid(i,k), es, qs)
            cp_rh(i,k) = state_loc%q(i, k, 1) / qs * 100._r8
@@ -3647,22 +3655,18 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
 
       call outfld("TROPF_RHADJ", cp_rh,       pcols, lchnk)
    end if
-
    ! ptend_loc is deallocated in physics_update above
+
    call physics_state_dealloc(state_loc)
 
-#if defined (__OPENACC__)
    deallocate(icimrst_subgrid,rei_subgrid,niic_subgrid)
-#endif
 
 end subroutine micro_mg_cam_tend_pack
 
 subroutine massless_droplet_destroyer(ztodt, state,  ptend)
-
      ! This subroutine eradicates cloud droplets in grid boxes with no cloud
      ! mass.  This code is now expanded to remove massless rain drops, ice
      ! crystals, and snow flakes.
-     !
      ! Note: qsmall, which is a small, positive number, is used as the
      !       threshold here instead of qmin, which is 0.  Some numbers that are
      !       supposed to have a value of 0, but don't because of numerical
@@ -3671,25 +3675,27 @@ subroutine massless_droplet_destroyer(ztodt, state,  ptend)
      !       for unreasonable massless drop concentrations to be removed in
      !       those scenarios.
 
+     !
+
      use constituents,     only: cnst_get_ind
      use micro_mg_utils,   only: qsmall
      use ref_pres,         only: top_lev => trop_cloud_top_lev
 
      implicit none
-
      ! Input Variables
+
      real(r8), intent(in)                  :: ztodt     ! model time increment
      type(physics_state), intent(in)       :: state     ! state for columns
-
      ! Input/Output Variables
+
      type(physics_ptend), intent(inout)    :: ptend     ! ptend for columns
-
      ! Local Variables
+
      integer :: icol, k
-
      !----- Begin Code -----
-
      ! Don't do anything if this option isn't enabled.
+
+
      if ( .not. micro_do_massless_droplet_destroyer ) return
 
      col_loop: do icol=1, state%ncol
