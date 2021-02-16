@@ -624,12 +624,11 @@ subroutine size_dist_param_liq_vect(props, qcic, ncic, rho, pgam, lamc, vlen)
 
   ! local variables
   integer :: i, cnt
-  real(r8) :: tmp(max_vlen),pgamp1(max_vlen)
-  real(r8) :: shapeC(max_vlen),lbnd(max_vlen),ubnd(max_vlen)
+  real(r8) :: tmp(vlen),pgamp1(vlen)
+  real(r8) :: shapeC(vlen),lbnd(vlen),ubnd(vlen)
 
-  !$acc enter data create (tmp,pgamp1,shapeC,lbnd,ubnd)
-
-  !$acc data present (props,qcic,ncic,rho,pgam,lamc)
+  !$acc data present (props,qcic,ncic,rho,pgam,lamc) &
+  !$acc      create (tmp,pgamp1,shapeC,lbnd,ubnd)
 
     !$acc parallel vector_length(VLEN) default(present)
     !$acc loop gang vector
@@ -1507,6 +1506,7 @@ end subroutine contact_freezing
 ! ignore self-collection of cloud ice
 
 subroutine snow_self_aggregation(t, rho, asn, rhosn, qsic, nsic, nsagg, vlen)
+!$acc routine seq
 
   integer,                          intent(in) :: vlen
 
@@ -1526,8 +1526,9 @@ subroutine snow_self_aggregation(t, rho, asn, rhosn, qsic, nsic, nsagg, vlen)
 
   !$acc data present (t,rho,asn,qsic,nsic,nsagg)
 
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector
+!!  !$acc parallel vector_length(VLEN) default(present)
+!!  !$acc loop gang vector
+!!  !$acc loop seq 
   do i=1,vlen
      if (qsic(i) >= qsmall .and. t(i) <= tmelt) then
         nsagg(i) = -1108._r8*eii/(4._r8*720._r8*rhosn)*asn(i)*qsic(i)*nsic(i)*rho(i)*&
@@ -1536,7 +1537,7 @@ subroutine snow_self_aggregation(t, rho, asn, rhosn, qsic, nsic, nsagg, vlen)
         nsagg(i)=0._r8
      end if
   end do
-  !$acc end parallel
+!!  !$acc end parallel
 
   !$acc end data
 end subroutine snow_self_aggregation

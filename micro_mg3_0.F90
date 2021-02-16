@@ -120,6 +120,7 @@ use shr_spfn_mod, only: gamma => shr_spfn_gamma
 use perf_mod
 
 use wv_sat_methods, only: &
+     qsat_water_line => wv_sat_qsat_water, &
      qsat_water => wv_sat_qsat_water_vect, &
      qsat_ice => wv_sat_qsat_ice_vect
 
@@ -1127,7 +1128,19 @@ subroutine micro_mg_tend ( &
 
   !!call t_startf ('micro_mg3_qsat')
 
-  call qsat_water(t, p, esl, qvl, mgncol*nlev)
+!!  !$acc parallel vector_length(VLEN) default(present)
+!!  !$acc loop gang vector collapse(2)
+!!  do k = 1, nlev
+!!     do i = 1, mgncol
+!!        call qsat_water_line(t(i,k), p(i,k), esl(i,k), qvl(i,k), 1)
+!!     end do
+!!  end do
+!!  !$acc end parallel
+  do k = 1, nlev
+     do i = 1, mgncol
+  call qsat_water(t(i,k), p(i,k), esl(i,k), qvl(i,k), 1)
+  end do
+  end do 
   call qsat_ice(t, p, esi, qvi, mgncol*nlev)
 
   !!call t_stopf ('micro_mg3_qsat')
@@ -1996,7 +2009,14 @@ subroutine micro_mg_tend ( &
 
   !!call t_startf ('micro_mg3_snow_self_aggregation')
 
-  call snow_self_aggregation(t, rho, asn, rhosn, qsic, nsic, nsagg, mgncol*nlev)
+  !$acc parallel vector_length(VLEN) default(present)
+  !$acc loop gang vector collapse(2)
+  do k = 1, nlev
+     do i = 1, mgncol
+        call snow_self_aggregation(t(i,k), rho(i,k), asn(i,k), rhosn, qsic(i,k), nsic(i,k), nsagg(i,k), 1)
+     end do
+  end do
+  !$acc end parallel
 
   !!call t_stopf ('micro_mg3_snow_self_aggregation')
 
