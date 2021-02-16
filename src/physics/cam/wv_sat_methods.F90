@@ -55,7 +55,7 @@ integer, parameter :: Bolton_idx = 3
 integer, parameter :: initial_default_idx = GoffGratch_idx
 integer :: default_idx = initial_default_idx
 
-!$acc declare create (epsilo, tmelt, tboil, default_idx, omeps, h2otrip)
+!$acc declare create (epsilo, tmelt, tboil, default_idx, omeps, h2otrip, ttrice)
 
 public wv_sat_methods_init
 public wv_sat_get_scheme_idx
@@ -116,6 +116,8 @@ subroutine wv_sat_methods_init(kind, tmelt_in, h2otrip_in, tboil_in, &
   epsilo = epsilo_in
 
   omeps = 1._r8 - epsilo
+
+!$acc update device (tmelt,h2otrip,tboil,ttrice,epsilo,omeps)
 
 end subroutine wv_sat_methods_init
 
@@ -185,9 +187,15 @@ end subroutine wv_sat_reset_default
 ! Specific humidity is limited to range 0-1.
 function wv_sat_svp_to_qsat(es, p) result(qs)
 
+!$acc routine seq
+
   real(r8), intent(in) :: es  ! SVP
   real(r8), intent(in) :: p   ! Current pressure.
   real(r8)             :: qs
+
+!$acc update device (epsilo,omeps)
+
+!$acc data present (es,p)
 
   ! If pressure is less than SVP, set qs to maximum of 1.
   if ( (p - es) <= 0._r8 ) then
@@ -195,6 +203,8 @@ function wv_sat_svp_to_qsat(es, p) result(qs)
   else
      qs = epsilo*es / (p - omeps*es)
   end if
+
+!$acc end data
 
 end function wv_sat_svp_to_qsat
 
@@ -235,6 +245,8 @@ subroutine wv_sat_qsat_water(t, p, es, qs, idx)
   !   calculate and return saturation specific humidity.             !
   !------------------------------------------------------------------!
 
+!$acc routine seq
+
   ! Inputs
   real(r8), intent(in) :: t    ! Temperature
   real(r8), intent(in) :: p    ! Pressure
@@ -244,12 +256,16 @@ subroutine wv_sat_qsat_water(t, p, es, qs, idx)
 
   integer,  intent(in), optional :: idx ! Scheme index
 
+!$acc data present (t, p, es, qs)
+
   es = wv_sat_svp_water(t, idx)
 
   qs = wv_sat_svp_to_qsat(es, p)
 
   ! Ensures returned es is consistent with limiters on qs.
   es = min(es, p)
+
+!$acc end data
 
 end subroutine wv_sat_qsat_water
 
@@ -294,6 +310,8 @@ subroutine wv_sat_qsat_ice(t, p, es, qs, idx)
   !   calculate and return saturation specific humidity.             !
   !------------------------------------------------------------------!
 
+!$acc routine seq
+
   ! Inputs
   real(r8), intent(in) :: t    ! Temperature
   real(r8), intent(in) :: p    ! Pressure
@@ -303,12 +321,16 @@ subroutine wv_sat_qsat_ice(t, p, es, qs, idx)
 
   integer,  intent(in), optional :: idx ! Scheme index
 
+!$acc data present (t, p, es, qs)
+
   es = wv_sat_svp_ice(t, idx)
 
   qs = wv_sat_svp_to_qsat(es, p)
 
   ! Ensures returned es is consistent with limiters on qs.
   es = min(es, p)
+
+!$acc end data
 
 end subroutine wv_sat_qsat_ice
 
@@ -353,6 +375,8 @@ subroutine wv_sat_qsat_trans(t, p, es, qs, idx)
   !   calculate and return saturation specific humidity.             !
   !------------------------------------------------------------------!
 
+!$acc routine seq
+
   ! Inputs
   real(r8), intent(in) :: t    ! Temperature
   real(r8), intent(in) :: p    ! Pressure
@@ -362,12 +386,16 @@ subroutine wv_sat_qsat_trans(t, p, es, qs, idx)
 
   integer,  intent(in), optional :: idx ! Scheme index
 
+!$acc data present (t, p, es, qs)
+
   es = wv_sat_svp_trans(t, idx)
 
   qs = wv_sat_svp_to_qsat(es, p)
 
   ! Ensures returned es is consistent with limiters on qs.
   es = min(es, p)
+
+!$acc end data
 
 end subroutine wv_sat_qsat_trans
 
@@ -376,11 +404,18 @@ end subroutine wv_sat_qsat_trans
 !---------------------------------------------------------------------
 
 function wv_sat_svp_water(t, idx) result(es)
+
+!$acc routine seq
+
   real(r8), intent(in) :: t
   integer,  intent(in), optional :: idx
   real(r8)             :: es
 
   integer :: use_idx
+
+!$acc update device (default_idx)
+
+!$acc data present (t)
 
   if (present(idx)) then
      use_idx = idx
@@ -398,6 +433,8 @@ function wv_sat_svp_water(t, idx) result(es)
   case(Bolton_idx)
      es = Bolton_svp_water(t)
   end select
+
+!$acc end data
 
 end function wv_sat_svp_water
 
@@ -429,11 +466,18 @@ subroutine  wv_sat_svp_water_vect(t, es, vlen, idx)
 end subroutine wv_sat_svp_water_vect
 
 function wv_sat_svp_ice(t, idx) result(es)
+
+!$acc routine seq
+
   real(r8), intent(in)  :: t
   integer,  intent(in), optional :: idx
   real(r8)              :: es
 
   integer :: use_idx
+
+!$acc update device (default_idx)
+
+!$acc data present (t)
 
   if (present(idx)) then
      use_idx = idx
@@ -451,6 +495,8 @@ function wv_sat_svp_ice(t, idx) result(es)
   case(Bolton_idx)
      es = Bolton_svp_water(t)
   end select
+
+!$acc end data
 
 end function wv_sat_svp_ice
 
@@ -484,12 +530,18 @@ end subroutine wv_sat_svp_ice_vect
 
 function wv_sat_svp_trans(t, idx) result(es)
 
+!$acc routine seq
+
   real(r8), intent(in) :: t
   integer,  intent(in), optional :: idx
   real(r8) :: es
 
   real(r8) :: esice      ! Saturation vapor pressure over ice
   real(r8) :: weight     ! Intermediate scratch variable for es transition
+
+!$acc update device (tmelt,ttrice)
+
+!$acc data present (t)
 
 !
 ! Water
@@ -516,6 +568,8 @@ function wv_sat_svp_trans(t, idx) result(es)
      es = weight*esice + (1.0_r8 - weight)*es
   end if
 
+!$acc end data
+
 end function wv_sat_svp_trans
 
 !---------------------------------------------------------------------
@@ -524,9 +578,15 @@ end function wv_sat_svp_trans
 
 ! Goff & Gratch (1946)
 
-elemental function GoffGratch_svp_water(t) result(es)
+function GoffGratch_svp_water(t) result(es)
+!$acc routine seq
+
   real(r8), intent(in) :: t  ! Temperature in Kelvin
   real(r8) :: es             ! SVP in Pa
+
+!$acc update device (tboil)
+
+!$acc data present (t)
 
   ! uncertain below -70 C
   es = 10._r8**(-7.90298_r8*(tboil/t-1._r8)+ &
@@ -534,6 +594,8 @@ elemental function GoffGratch_svp_water(t) result(es)
        1.3816e-7_r8*(10._r8**(11.344_r8*(1._r8-t/tboil))-1._r8)+ &
        8.1328e-3_r8*(10._r8**(-3.49149_r8*(tboil/t-1._r8))-1._r8)+ &
        log10(1013.246_r8))*100._r8
+
+!$acc end data
 
 end function GoffGratch_svp_water
 
@@ -562,14 +624,23 @@ subroutine GoffGratch_svp_water_vect(t, es, vlen)
   !$acc end data
 end subroutine GoffGratch_svp_water_vect
 
-elemental function GoffGratch_svp_ice(t) result(es)
+function GoffGratch_svp_ice(t) result(es)
+
+!$acc routine seq
+
   real(r8), intent(in) :: t  ! Temperature in Kelvin
   real(r8) :: es             ! SVP in Pa
+
+!$acc update device (h2otrip)
+
+!$acc data present (t)
 
   ! good down to -100 C
   es = 10._r8**(-9.09718_r8*(h2otrip/t-1._r8)-3.56654_r8* &
        log10(h2otrip/t)+0.876793_r8*(1._r8-t/h2otrip)+ &
        log10(6.1071_r8))*100._r8
+
+!$acc end data
 
 end function GoffGratch_svp_ice
 
@@ -598,15 +669,22 @@ end subroutine GoffGratch_svp_ice_vect
 
 ! Murphy & Koop (2005)
 
-elemental function MurphyKoop_svp_water(t) result(es)
+function MurphyKoop_svp_water(t) result(es)
+
+!$acc routine seq
+
   real(r8), intent(in) :: t  ! Temperature in Kelvin
   real(r8) :: es             ! SVP in Pa
+
+!$acc data present (t)
 
   ! (good for 123 < T < 332 K)
   es = exp(54.842763_r8 - (6763.22_r8 / t) - (4.210_r8 * log(t)) + &
        (0.000367_r8 * t) + (tanh(0.0415_r8 * (t - 218.8_r8)) * &
        (53.878_r8 - (1331.22_r8 / t) - (9.44523_r8 * log(t)) + &
        0.014025_r8 * t)))
+
+!$acc end data
 
 end function MurphyKoop_svp_water
 
@@ -633,13 +711,20 @@ subroutine MurphyKoop_svp_water_vect(t, es, vlen)
   !$acc end data
 end subroutine MurphyKoop_svp_water_vect
 
-elemental function MurphyKoop_svp_ice(t) result(es)
+function MurphyKoop_svp_ice(t) result(es)
+
+!$acc routine seq
+
   real(r8), intent(in) :: t  ! Temperature in Kelvin
   real(r8) :: es             ! SVP in Pa
+
+!$acc data present (t)
 
   ! (good down to 110 K)
   es = exp(9.550426_r8 - (5723.265_r8 / t) + (3.53068_r8 * log(t)) &
        - (0.00728332_r8 * t))
+
+!$acc end data
 
 end function MurphyKoop_svp_ice
 
@@ -678,10 +763,17 @@ end subroutine MurphyKoop_svp_ice_vect
 ! probably a mistake, it mildly improves accuracy for ice svp,
 ! since it compensates for a systematic error in Goff & Gratch.
 
-elemental function OldGoffGratch_svp_water(t) result(es)
+function OldGoffGratch_svp_water(t) result(es)
+
+!$acc routine seq
+
   real(r8), intent(in) :: t
   real(r8) :: es
   real(r8) :: ps, e1, e2, f1, f2, f3, f4, f5, f
+
+!$acc update device (tboil)
+
+!$acc data present (t)
 
   ps = 1013.246_r8
   e1 = 11.344_r8*(1.0_r8 - t/tboil)
@@ -694,6 +786,8 @@ elemental function OldGoffGratch_svp_water(t) result(es)
   f  = f1 + f2 + f3 + f4 + f5
 
   es = (10.0_r8**f)*100.0_r8
+
+!$acc end data
   
 end function OldGoffGratch_svp_water
 
@@ -730,16 +824,25 @@ subroutine OldGoffGratch_svp_water_vect(t,es,vlen)
   !$acc end data
 end subroutine OldGoffGratch_svp_water_vect
 
-elemental function OldGoffGratch_svp_ice(t) result(es)
+function OldGoffGratch_svp_ice(t) result(es)
+
+!$acc routine seq
+
   real(r8), intent(in) :: t
   real(r8) :: es
   real(r8) :: term1, term2, term3
+
+!$acc update device (tmelt)
+
+!$acc data present (t)
 
   term1 = 2.01889049_r8/(tmelt/t)
   term2 = 3.56654_r8*log(tmelt/t)
   term3 = 20.947031_r8*(tmelt/t)
 
   es = 575.185606e10_r8*exp(-(term1 + term2 + term3))
+
+!$acc end data
   
 end function OldGoffGratch_svp_ice
 
@@ -779,7 +882,10 @@ end subroutine OldGoffGratch_svp_ice_vect
 ! The original formula used degrees C, but this function
 ! takes Kelvin and internally converts.
 
-elemental function Bolton_svp_water(t) result(es)
+function Bolton_svp_water(t) result(es)
+
+!$acc routine seq
+
   real(r8),parameter :: c1 = 611.2_r8
   real(r8),parameter :: c2 = 17.67_r8
   real(r8),parameter :: c3 = 243.5_r8
@@ -787,7 +893,13 @@ elemental function Bolton_svp_water(t) result(es)
   real(r8), intent(in) :: t  ! Temperature in Kelvin
   real(r8) :: es             ! SVP in Pa
 
+!$acc update device (tmelt)
+
+!$acc data present (t)
+
   es = c1*exp( (c2*(t - tmelt))/((t - tmelt)+c3) )
+
+!$acc end data
 
 end function Bolton_svp_water
 
