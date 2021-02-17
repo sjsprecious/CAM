@@ -121,6 +121,7 @@ use perf_mod
 
 use wv_sat_methods, only: &
      qsat_water_line => wv_sat_qsat_water, &
+     qsat_ice_line => wv_sat_qsat_ice, &
      qsat_water => wv_sat_qsat_water_vect, &
      qsat_ice => wv_sat_qsat_ice_vect
 
@@ -1117,46 +1118,23 @@ subroutine micro_mg_tend ( &
        acn(i,k)=g*rhow/(18._r8*mu(i,k))
        ain(i,k)=ai*(rhosu/rho(i,k))**0.35_r8
        ajn(i,k)=aj*(rhosu/rho(i,k))**0.35_r8
-    end do
+     end do
   end do
-  !$acc end parallel
 
-  call nvtxEndRange
-
-  !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-  ! Get humidity and saturation vapor pressures
-
-  !!call t_startf ('micro_mg3_qsat')
-
-!!  !$acc parallel vector_length(VLEN) default(present)
-!!  !$acc loop gang vector collapse(2)
-!!  do k = 1, nlev
-!!     do i = 1, mgncol
-!!        call qsat_water_line(t(i,k), p(i,k), esl(i,k), qvl(i,k), 1)
-!!     end do
-!!  end do
-!!  !$acc end parallel
-  do k = 1, nlev
-     do i = 1, mgncol
-  call qsat_water(t(i,k), p(i,k), esl(i,k), qvl(i,k), 1)
-  end do
-  end do 
-  call qsat_ice(t, p, esi, qvi, mgncol*nlev)
-
-  !!call t_stopf ('micro_mg3_qsat')
-
-  call nvtxStartRange("mg3_bigkernel", 1)
-
-  !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2)
   do k=1,nlev
      do i=1,mgncol
+
+  !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  ! Get humidity and saturation vapor pressures
+        call qsat_water_line(t(i,k), p(i,k), esl(i,k), qvl(i,k), 1)
 
         ! make sure when above freezing that esi=esl, not active yet
         if (t(i,k) >= tmelt) then
            esi(i,k)=esl(i,k)
            qvi(i,k)=qvl(i,k)
         else
+           call qsat_ice_line(t(i,k), p(i,k), esi(i,k), qvi(i,k), 1)
            ! Scale the water saturation values to reflect subgrid scale
            ! ice cloud fraction, where ice clouds begin forming at a
            ! gridbox average relative humidity of rhmini (not 1).
