@@ -1089,6 +1089,8 @@ end subroutine ice_deposition_sublimation
 subroutine kk2000_liq_autoconversion(microp_uniform, qcic, &
      ncic, rho, relvar, prc, nprc, nprc1, vlen)
 
+!$acc routine seq
+
   integer, intent(in) :: vlen
   logical, intent(in) :: microp_uniform
 
@@ -1110,18 +1112,20 @@ subroutine kk2000_liq_autoconversion(microp_uniform, qcic, &
 
   ! Take variance into account, or use uniform value.
   if (.not. microp_uniform) then
-     call var_coef(relvar, 2.47_r8, prc_coef,vlen)
+     do i = 1, vlen
+        call var_coef(relvar(i), 2.47_r8, prc_coef(i))
+     end do
   else
-     !$acc parallel vector_length(VLEN) default(present)
-     !$acc loop gang vector
+!!     !$acc parallel vector_length(VLEN) default(present)
+!!     !$acc loop gang vector
      do i = 1,vlen
         prc_coef(i) = 1._r8
      end do
-     !$acc end parallel
+!!     !$acc end parallel
   end if
 
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector
+!!  !$acc parallel vector_length(VLEN) default(present)
+!!  !$acc loop gang vector
   do i=1,vlen
      if (qcic(i) >= icsmall) then
         ! nprc is increase in rain number conc due to autoconversion
@@ -1140,7 +1144,7 @@ subroutine kk2000_liq_autoconversion(microp_uniform, qcic, &
         nprc1(i)=0._r8
      end if
   end do
-  !$acc end parallel
+!!  !$acc end parallel
 
   !$acc end data
 end subroutine kk2000_liq_autoconversion

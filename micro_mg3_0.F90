@@ -1647,11 +1647,14 @@ subroutine micro_mg_tend ( &
   ! minimum qc of 1 x 10^-8 prevents floating point error
 
   if (.not. do_sb_physics) then
-    !!call t_startf ('micro_mg3_kk2000_liq_autoconversion')
-
-    call kk2000_liq_autoconversion(microp_uniform, qcic, ncic, rho, relvar, prc, nprc, nprc1, mgncol*nlev)
-
-    !!call t_stopf ('micro_mg3_kk2000_liq_autoconversion')
+     !$acc parallel vector_length(VLEN) default(present)
+     !$acc loop gang vector collapse(2)
+     do k=1,nlev
+        do i=1,mgncol
+           call kk2000_liq_autoconversion(microp_uniform, qcic(i,k), ncic(i,k), rho(i,k), relvar(i,k), prc(i,k), nprc(i,k), nprc1(i,k), 1)
+        end do
+     end do
+     !$acc end parallel
   endif
 
   !!call t_startf ('micro_mg3_misc')
