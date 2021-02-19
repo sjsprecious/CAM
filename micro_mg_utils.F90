@@ -1162,6 +1162,8 @@ subroutine sb2001v2_liq_autoconversion(pgam,qc,nc,qr,rho,relvar,au,nprc,nprc1,vl
   ! autoconversion
   ! use simple lookup table of dnu values to get mass spectral shape parameter
   ! equivalent to the size spectral shape parameter pgam
+
+!$acc routine seq
     
   integer, intent(in) :: vlen  
   
@@ -1191,8 +1193,8 @@ subroutine sb2001v2_liq_autoconversion(pgam,qc,nc,qr,rho,relvar,au,nprc,nprc1,vl
 
   !$acc data present (pgam,qc,nc,qr,rho,relvar,au,nprc1,nprc)
 
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector private(dumi,nu,dum,dum1)
+!!  !$acc parallel vector_length(VLEN) default(present)
+!!  !$acc loop gang vector private(dumi,nu,dum,dum1)
   do i=1,vlen
 
      if (qc(i) > qsmall) then
@@ -1217,7 +1219,7 @@ subroutine sb2001v2_liq_autoconversion(pgam,qc,nc,qr,rho,relvar,au,nprc,nprc1,vl
      end if
   
   end do
-  !$acc end parallel
+!!  !$acc end parallel
 
   !$acc end data
   end subroutine sb2001v2_liq_autoconversion 

@@ -1646,23 +1646,14 @@ subroutine micro_mg_tend ( &
   ! formula from Khrouditnov and Kogan (2000), modified for sub-grid distribution of qc
   ! minimum qc of 1 x 10^-8 prevents floating point error
 
-  if (.not. do_sb_physics) then
-     !$acc parallel vector_length(VLEN) default(present)
-     !$acc loop gang vector collapse(2)
-     do k=1,nlev
-        do i=1,mgncol
-           call kk2000_liq_autoconversion(microp_uniform, qcic(i,k), ncic(i,k), rho(i,k), relvar(i,k), prc(i,k), nprc(i,k), nprc1(i,k), 1)
-        end do
-     end do
-     !$acc end parallel
-  endif
-
-  !!call t_startf ('micro_mg3_misc')
-
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2)
   do k=1,nlev
      do i=1,mgncol
+        if (.not. do_sb_physics) then
+           call kk2000_liq_autoconversion(microp_uniform, qcic(i,k), ncic(i,k), rho(i,k), relvar(i,k), prc(i,k), nprc(i,k), nprc1(i,k), 1)
+        endif
+
         ! assign qric based on prognostic qr, using assumed precip fraction
         ! note: this could be moved above for consistency with qcic and qiic calculations
         qric(i,k) = qr(i,k)/precip_frac(i,k)
@@ -1685,8 +1676,6 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  !!call t_stopf ('micro_mg3_misc')
-
   !!call t_startf ('micro_mg3_size_dist_param_basic_vect')
 
   ! Get size distribution parameters for cloud ice
@@ -1695,13 +1684,17 @@ subroutine micro_mg_tend ( &
   !!call t_stopf ('micro_mg3_size_dist_param_basic_vect')
 
   ! Alternative autoconversion 
-  if (do_sb_physics) then
-     !!call t_startf ('micro_mg3_sb2001v2_liq_autoconversion')
-
-     call sb2001v2_liq_autoconversion(pgam, qcic, ncic, qric, rho, relvar, prc, nprc, nprc1, mgncol*nlev) 
-
-     !!call t_stopf ('micro_mg3_sb2001v2_liq_autoconversion')
-  end if
+  !$acc parallel vector_length(VLEN) default(present)
+  !$acc loop gang vector collapse(2)
+  do k=1,nlev
+     do i=1,mgncol
+        if (do_sb_physics) then
+           call sb2001v2_liq_autoconversion(pgam(i,k), qcic(i,k), ncic(i,k), qric(i,k), rho(i,k), &
+                                            relvar(i,k), prc(i,k), nprc(i,k), nprc1(i,k), 1) 
+        end if
+     end do
+  end do
+  !$acc end parallel
 
   !.......................................................................
   ! Autoconversion of cloud ice to snow
