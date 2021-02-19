@@ -2464,6 +2464,7 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
 
          end select
       case(2:3)
+    write(iulog, *), 'substep = ', it, ', mgncol = ', mgncol
     call t_startf ('micro_mg3_tend')
          call micro_mg_tend3_0( &
               mgncol,         nlev,           dtime/num_steps,&
