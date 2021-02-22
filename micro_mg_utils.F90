@@ -1845,6 +1845,8 @@ end subroutine accrete_cloud_water_rain
 
 subroutine self_collection_rain(rho, qric, nric, nragg, vlen)
 
+!$acc routine seq
+
   integer,                          intent(in) :: vlen
   real(r8), dimension(vlen), intent(in) :: rho  ! Air density
 
@@ -1859,8 +1861,6 @@ subroutine self_collection_rain(rho, qric, nric, nragg, vlen)
 
   !$acc data present (rho,qric,nric,nragg)
 
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector
   do i=1,vlen
      if (qric(i) >= qsmall) then
         nragg(i) = -8._r8*nric(i)*qric(i)*rho(i)
@@ -1868,7 +1868,6 @@ subroutine self_collection_rain(rho, qric, nric, nragg, vlen)
         nragg(i) = 0._r8
      end if
   end do
-  !$acc end parallel
 
   !$acc end data
 end subroutine self_collection_rain
@@ -1881,6 +1880,8 @@ end subroutine self_collection_rain
 
 subroutine accrete_cloud_ice_snow(t, rho, asn, qiic, niic, qsic, &
      lams, n0s, prai, nprai, vlen)
+
+!$acc routine seq
 
   integer,                          intent(in) :: vlen
   real(r8), dimension(vlen), intent(in) :: t    ! Temperature
@@ -1909,8 +1910,6 @@ subroutine accrete_cloud_ice_snow(t, rho, asn, qiic, niic, qsic, &
 
   !$acc data present (t,rho,asn,qiic,niic,qsic,lams,n0s,prai,nprai)
 
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector private(accrete_rate)
   do i=1,vlen
      if (qsic(i) >= qsmall .and. qiic(i) >= qsmall .and. t(i) <= tmelt) then
         accrete_rate = pi/4._r8 * eii * asn(i) * rho(i) * n0s(i) * gamma_bs_plus3/ &
@@ -1922,7 +1921,6 @@ subroutine accrete_cloud_ice_snow(t, rho, asn, qiic, niic, qsic, &
         nprai(i) = 0._r8
      end if
   end do
-  !$acc end parallel
 
   !$acc end data
 end subroutine accrete_cloud_ice_snow
@@ -2224,6 +2222,8 @@ end subroutine evaporate_sublimate_precip_graupel
 subroutine bergeron_process_snow(t, rho, dv, mu, sc, qvl, qvi, asn, &
      qcic, qsic, lams, n0s, bergs, vlen)
 
+!$acc routine seq
+
   integer, intent(in) :: vlen
 
   real(r8), dimension(vlen), intent(in) :: t    ! temperature
@@ -2256,8 +2256,6 @@ subroutine bergeron_process_snow(t, rho, dv, mu, sc, qvl, qvi, asn, &
   !$acc data present (t,rho,dv,mu,sc,qvl,qvi) &
   !$acc      present (asn,qcic,qsic,lams,n0s,bergs)
 
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector private(eps,ab)
   do i=1,vlen
      if (qsic(i) >= qsmall.and. qcic(i) >= qsmall .and. t(i) < tmelt) then
         call calc_ab(t(i), qvi(i), xxls, ab)
@@ -2271,7 +2269,6 @@ subroutine bergeron_process_snow(t, rho, dv, mu, sc, qvl, qvi, asn, &
         bergs(i) = 0._r8
      end if
   end do
-  !$acc end parallel
 
   !$acc end data
 end subroutine bergeron_process_snow

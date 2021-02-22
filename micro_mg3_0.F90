@@ -1907,56 +1907,25 @@ subroutine micro_mg_tend ( &
                                          relvar(i,k), accre_enhan(i,k), pra(i,k), npra(i,k), 1)
         endif
 
-     end do
-  end do
-  !$acc end parallel
+        call self_collection_rain(rho(i,k), qric(i,k), nric(i,k), nragg(i,k), 1)
 
-  !!call t_startf ('micro_mg3_self_collection_rain')
-
-  call self_collection_rain(rho, qric, nric, nragg, mgncol*nlev)
-
-  !!call t_stopf ('micro_mg3_self_collection_rain')
-
-  if (do_cldice) then
-     !!call t_startf ('micro_mg3_accrete_cloud_ice_snow')
-
-     call accrete_cloud_ice_snow(t, rho, asn, qiic, niic, qsic, lams, n0s, prai, nprai, mgncol*nlev)
-
-     !!call t_stopf ('micro_mg3_accrete_cloud_ice_snow')
-  else
-     !!call t_startf ('micro_mg3_misc')
-
-     !$acc parallel vector_length(VLEN) default(present)
-     !$acc loop gang vector collapse(2)
-     do k=1,nlev
-        do i=1,mgncol
+        if (do_cldice) then
+           call accrete_cloud_ice_snow(t(i,k), rho(i,k), asn(i,k), qiic(i,k), niic(i,k), &
+                                       qsic(i,k), lams(i,k), n0s(i,k), prai(i,k), nprai(i,k), 1)
+        else
            prai(i,k) = 0._r8
            nprai(i,k) = 0._r8
-        end do
-     end do
-     !$acc end parallel
+        end if
 
-     !!call t_stopf ('micro_mg3_misc')
-  end if
+        call bergeron_process_snow(t(i,k), rho(i,k), dv(i,k), mu(i,k), sc(i,k), qvl(i,k), &
+                                   qvi(i,k), asn(i,k), qcic(i,k), qsic(i,k), lams(i,k), &
+                                   n0s(i,k), bergs(i,k), 1)
 
-  !!call t_startf ('micro_mg3_bergeron_process_snow')
-
-  call bergeron_process_snow(t, rho, dv, mu, sc, qvl, qvi, asn, qcic, qsic, lams, n0s, bergs, mgncol*nlev)
-
-  !!call t_stopf ('micro_mg3_bergeron_process_snow')
-
-  !!call t_startf ('micro_mg3_misc')
-
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-     do i=1,mgncol
         bergs(i,k)=bergs(i,k)*micro_mg_berg_eff_factor
+
      end do
   end do
   !$acc end parallel
-
-  !!call t_stopf ('micro_mg3_misc')
 
   if (do_cldice) then
      !!call t_startf ('micro_mg3_ice_deposition_sublimation')
