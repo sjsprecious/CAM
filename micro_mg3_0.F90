@@ -976,6 +976,8 @@ subroutine micro_mg_tend ( &
   bgtmp=0._r8
   rhogtmp=0._r8
 
+  !......................................................................
+  !       graupel/hail density set (Hail = 400, Graupel = 500 from M2005)
   if (do_hail) then 
      bgtmp = bh 
      rhogtmp = rhoh
@@ -1692,49 +1694,24 @@ subroutine micro_mg_tend ( &
            call sb2001v2_liq_autoconversion(pgam(i,k), qcic(i,k), ncic(i,k), qric(i,k), rho(i,k), &
                                             relvar(i,k), prc(i,k), nprc(i,k), nprc1(i,k), 1) 
         end if
-     end do
-  end do
-  !$acc end parallel
 
-  !.......................................................................
-  ! Autoconversion of cloud ice to snow
-  ! similar to Ferrier (1994)
+        !.......................................................................
+        ! Autoconversion of cloud ice to snow
+        ! similar to Ferrier (1994)
 
-  if (do_cldice) then
-     !!call t_startf ('micro_mg3_ice_autoconversion')
-
-     call ice_autoconversion(t, qiic, lami, n0i, dcs, prci, nprci, mgncol*nlev)
-
-     !!call t_stopf ('micro_mg3_ice_autoconversion')
-  else
-     ! Add in the particles that we have already converted to snow, and
-     ! don't do any further autoconversion of ice.
-
-     !!call t_startf ('micro_mg3_misc')
-
-     !$acc parallel vector_length(VLEN) default(present)
-     !$acc loop gang vector collapse(2)
-     do k=1,nlev
-        do i=1,mgncol
+        if (do_cldice) then
+           call ice_autoconversion(t(i,k), qiic(i,k), lami(i,k), n0i(i,k), dcs, prci(i,k), nprci(i,k), 1)
+        else
+           ! Add in the particles that we have already converted to snow, and
+           ! don't do any further autoconversion of ice.
            prci(i,k)  = tnd_qsnow(i,k) / cldm(i,k)
            nprci(i,k) = tnd_nsnow(i,k) / cldm(i,k)
-        end do
-     end do
-     !$acc end parallel
+        end if
 
-     !!call t_stopf ('micro_mg3_misc')
-  end if
+        ! note, currently we don't have this
+        ! inside the do_cldice block, should be changed later
+        ! assign qsic based on prognostic qs, using assumed precip fraction
 
-  ! note, currently we don't have this
-  ! inside the do_cldice block, should be changed later
-  ! assign qsic based on prognostic qs, using assumed precip fraction
-
-   !!call t_startf ('micro_mg3_misc')
-
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-     do i=1,mgncol
         qsic(i,k) = qs(i,k)/precip_frac(i,k)
         nsic(i,k) = ns(i,k)/precip_frac(i,k)
 
@@ -1771,20 +1748,12 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  !!call t_stopf ('micro_mg3_misc')
-
   !.......................................................................
   ! get size distribution parameters for precip
   !......................................................................
   ! rain
 
-  !!call t_startf ('micro_mg3_size_dist_param_basic_vect')
-
   call size_dist_param_basic_vect(mg_rain_props, qric, nric, lamr, mgncol*nlev, n0=n0r)
-
-  !!call t_stopf ('micro_mg3_size_dist_param_basic_vect')
-
-  !!call t_startf ('micro_mg3_misc')
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2)
@@ -1803,18 +1772,10 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  !!call t_stopf ('micro_mg3_misc')
-
   !......................................................................
   ! snow
 
-  !!call t_startf ('micro_mg3_size_dist_param_basic_vect')
-
   call size_dist_param_basic_vect(mg_snow_props, qsic, nsic, lams, mgncol*nlev, n0=n0s)
-
-  !!call t_stopf ('micro_mg3_size_dist_param_basic_vect')
-
-  !!call t_startf ('micro_mg3_misc')
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2)
@@ -1833,23 +1794,7 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  !!call t_stopf ('micro_mg3_misc')
-
-!  !......................................................................
-!  !       graupel/hail density set (Hail = 400, Graupel = 500 from M2005)
-!     
-!  if (do_hail) then 
-!     bgtmp = bh 
-!     rhogtmp = rhoh
-!  end if
-!  if (do_graupel) then 
-!     bgtmp = bg
-!     rhogtmp = rhog
-!  end if
-
   !  graupel/hail size distributions and properties
-
-  !!call t_startf ('micro_mg3_size_dist_param_basic_vect')
 
   if (do_hail) then
      call size_dist_param_basic_vect(mg_hail_props, qgic, ngic, lamg, mgncol*nlev, n0=n0g)
@@ -1858,50 +1803,32 @@ subroutine micro_mg_tend ( &
      call size_dist_param_basic_vect(mg_graupel_props, qgic, ngic, lamg, mgncol*nlev, n0=n0g)
   end if
 
-  !!call t_stopf ('micro_mg3_size_dist_param_basic_vect')
-
-  !!call t_startf ('micro_mg3_misc')
-        
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2)
   do k=1,nlev
      do i=1,mgncol
+
         if (lamg(i,k) > 0._r8) then
            dum_2D(i,k) = lamg(i,k)**bgtmp
            ! provisional graupel/hail number and mass weighted mean fallspeed (m/s)
            umg(i,k) = min(agn(i,k)*gamma_bg_plus4/(6._r8*dum_2D(i,k)),20._r8*rhof(i,k))
            ung(i,k) = min(agn(i,k)*gamma_bg_plus1/dum_2D(i,k),20._r8*rhof(i,k))
-!           umg(i,k) = min(agn(i,k)*gamma(4._r8+bgtmp)/(6._r8*dum_2D(i,k)),20._r8*rhof(i,k))
-!           ung(i,k) = min(agn(i,k)*gamma(1._r8+bgtmp)/dum_2D(i,k),20._r8*rhof(i,k))
         else
            umg(i,k) = 0._r8
            ung(i,k) = 0._r8
         end if
-     end do
-  end do
-  !$acc end parallel
 
-  !!call t_stopf ('micro_mg3_misc')
+        if (do_cldice) then
+           if (.not. use_hetfrz_classnuc) then
+              ! heterogeneous freezing of cloud water
+              !----------------------------------------------
 
-  if (do_cldice) then
-     if (.not. use_hetfrz_classnuc) then
-        ! heterogeneous freezing of cloud water
-        !----------------------------------------------
-        !!call t_startf ('micro_mg3_immersion_freezing')
+              call immersion_freezing(microp_uniform, t(i,k), pgam(i,k), lamc(i,k), qcic(i,k), &
+                                      ncic(i,k), relvar(i,k), mnuccc(i,k), nnuccc(i,k), 1)
 
-        call immersion_freezing(microp_uniform, t, pgam, lamc, qcic, ncic, relvar, mnuccc, nnuccc, mgncol*nlev)
+              ! make sure number of droplets frozen does not exceed available ice nuclei concentration
+              ! this prevents 'runaway' droplet freezing
 
-        !!call t_stopf ('micro_mg3_immersion_freezing')
-
-        ! make sure number of droplets frozen does not exceed available ice nuclei concentration
-        ! this prevents 'runaway' droplet freezing
-
-        !!call t_startf ('micro_mg3_misc')
-
-        !$acc parallel vector_length(VLEN) default(present)
-        !$acc loop gang vector collapse(2)
-        do k=1,nlev
-           do i=1,mgncol
               if (qcic(i,k).ge.qsmall .and. t(i,k).lt.269.15_r8 .and. &
                   nnuccc(i,k)*lcldm(i,k).gt.nnuccd(i,k)) then
                   ! scale mixing ratio of droplet freezing with limit
@@ -1910,29 +1837,15 @@ subroutine micro_mg_tend ( &
               end if
               mnudep(i,k)=0._r8
               nnudep(i,k)=0._r8
-           end do
-        end do
-        !$acc end parallel
 
-        !!call t_stopf ('micro_mg3_misc')
+              call contact_freezing(microp_uniform, t(i,k), p(i,k), rndst(i,k,mdust), nacon(i,k,mdust), &
+                                    pgam(i,k), lamc(i,k), qcic(i,k), ncic(i,k), relvar(i,k), &
+                                    mnucct(i,k), nnucct(i,k), 1, mdust)
+           else
+              ! Mass of droplets frozen is the average droplet mass, except
+              ! with two limiters: concentration must be at least 1/cm^3, and
+              ! mass must be at least the minimum defined above.
 
-        !!call t_startf ('micro_mg3_contact_freezing')
-
-        call contact_freezing(microp_uniform, t, p, rndst, nacon, pgam, lamc, qcic, ncic, &
-                              relvar, mnucct, nnucct, mgncol*nlev, mdust)
-
-        !!call t_stopf ('micro_mg3_contact_freezing')
-     else
-        ! Mass of droplets frozen is the average droplet mass, except
-        ! with two limiters: concentration must be at least 1/cm^3, and
-        ! mass must be at least the minimum defined above.
-
-        !!call t_startf ('micro_mg3_misc')
-
-        !$acc parallel vector_length(VLEN) default(present)
-        !$acc loop gang vector collapse(2)
-        do k=1,nlev
-           do i=1,mgncol
               mi0l(i,k) = qcic(i,k)/max(ncic(i,k), 1.0e6_r8/rho(i,k))
               mi0l(i,k) = max(mi0l_min, mi0l(i,k))
               if (qcic(i,k) >= qsmall) then
@@ -1954,101 +1867,49 @@ subroutine micro_mg_tend ( &
                  nnudep(i,k) = 0._r8
                  mnudep(i,k) = 0._r8
               end if
-           end do
-        end do
-        !$acc end parallel
-
-        !!call t_stopf ('micro_mg3_misc')
-
-     end if
-  else
-     !!call t_startf ('micro_mg3_misc')
-
-     !$acc parallel vector_length(VLEN) default(present)
-     !$acc loop gang vector collapse(2)
-     do k=1,nlev
-        do i=1,mgncol
+           end if
+        else
            mnuccc(i,k)=0._r8
            nnuccc(i,k)=0._r8
            mnucct(i,k)=0._r8
            nnucct(i,k)=0._r8
            mnudep(i,k)=0._r8
            nnudep(i,k)=0._r8
-        end do
-     end do
-     !$acc end parallel
+        end if
 
-     !!call t_stopf ('micro_mg3_misc')
-  end if
+        call snow_self_aggregation(t(i,k), rho(i,k), asn(i,k), rhosn, &
+                                   qsic(i,k), nsic(i,k), nsagg(i,k), 1)
 
-  !!call t_startf ('micro_mg3_snow_self_aggregation')
+        call accrete_cloud_water_snow(t(i,k), rho(i,k), asn(i,k), uns(i,k), mu(i,k), &
+                                      qcic(i,k), ncic(i,k), qsic(i,k), pgam(i,k), &
+                                      lamc(i,k), lams(i,k), n0s(i,k), psacws(i,k), &
+                                      npsacws(i,k), 1)
 
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector collapse(2)
-  do k = 1, nlev
-     do i = 1, mgncol
-        call snow_self_aggregation(t(i,k), rho(i,k), asn(i,k), rhosn, qsic(i,k), nsic(i,k), nsagg(i,k), 1)
+        if (do_cldice) then
+           call secondary_ice_production(t(i,k), psacws(i,k), msacwi(i,k), nsacwi(i,k), 1)
+        else
+           nsacwi(i,k) = 0.0_r8
+           msacwi(i,k) = 0.0_r8
+        end if
+
+        call accrete_rain_snow(t(i,k), rho(i,k), umr(i,k), ums(i,k), unr(i,k), uns(i,k), &
+                               qric(i,k), qsic(i,k), lamr(i,k), n0r(i,k), lams(i,k), &
+                               n0s(i,k), pracs(i,k), npracs(i,k), 1)
+
+        call heterogeneous_rain_freezing(t(i,k), qric(i,k), nric(i,k), lamr(i,k), &
+                                         mnuccr(i,k), nnuccr(i,k), 1)
+
+        if (do_sb_physics) then
+           call sb2001v2_accre_cld_water_rain(qcic(i,k), ncic(i,k), qric(i,k), rho(i,k), & 
+                                              relvar(i,k), pra(i,k), npra(i,k), 1)
+        else
+           call accrete_cloud_water_rain(microp_uniform, qric(i,k), qcic(i,k), ncic(i,k), &
+                                         relvar(i,k), accre_enhan(i,k), pra(i,k), npra(i,k), 1)
+        endif
+
      end do
   end do
   !$acc end parallel
-
-  !!call t_stopf ('micro_mg3_snow_self_aggregation')
-
-  !!call t_startf ('micro_mg3_accrete_cloud_water_snow')
-
-  call accrete_cloud_water_snow(t, rho, asn, uns, mu, qcic, ncic, qsic, pgam, &
-                                lamc, lams, n0s, psacws, npsacws, mgncol*nlev)
-
-  !!call t_stopf ('micro_mg3_accrete_cloud_water_snow')
-
-  if (do_cldice) then
-     !!call t_startf ('micro_mg3_secondary_ice_production')
-
-     call secondary_ice_production(t, psacws, msacwi, nsacwi, mgncol*nlev)
-
-     !!call t_stopf ('micro_mg3_secondary_ice_production')
-  else
-     !!call t_startf ('micro_mg3_misc')
-
-     !$acc parallel vector_length(VLEN) default(present)
-     !$acc loop gang vector collapse(2)
-     do k=1,nlev
-        do i=1,mgncol
-           nsacwi(i,k) = 0.0_r8
-           msacwi(i,k) = 0.0_r8
-        end do
-     end do
-     !$acc end parallel
-
-     !!call t_stopf ('micro_mg3_misc')
-  end if
-
-  !!call t_startf ('micro_mg3_accrete_rain_snow')
-
-  call accrete_rain_snow(t, rho, umr, ums, unr, uns, qric, qsic, lamr, &
-                         n0r, lams, n0s, pracs, npracs, mgncol*nlev)
-
-  !!call t_stopf ('micro_mg3_accrete_rain_snow')
-
-  !!call t_startf ('micro_mg3_heterogeneous_rain_freezing')
-
-  call heterogeneous_rain_freezing(t, qric, nric, lamr, mnuccr, nnuccr, mgncol*nlev)
-
-  !!call t_stopf ('micro_mg3_heterogeneous_rain_freezing')
-
-  if (do_sb_physics) then
-     !!call t_startf ('micro_mg3_sb2001v2_accre_cld_water_rain')
-
-     call sb2001v2_accre_cld_water_rain(qcic, ncic, qric, rho, relvar, pra, npra, mgncol*nlev)     
-
-     !!call t_stopf ('micro_mg3_sb2001v2_accre_cld_water_rain')
-  else
-     !!call t_startf ('micro_mg3_accrete_cloud_water_rain')
-
-     call accrete_cloud_water_rain(microp_uniform, qric, qcic, ncic, relvar, accre_enhan, pra, npra, mgncol*nlev)
-
-     !!call t_stopf ('micro_mg3_accrete_cloud_water_rain')
-  endif
 
   !!call t_startf ('micro_mg3_self_collection_rain')
 
