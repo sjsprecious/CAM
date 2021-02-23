@@ -120,10 +120,8 @@ use shr_spfn_mod, only: gamma => shr_spfn_gamma
 use perf_mod
 
 use wv_sat_methods, only: &
-     qsat_water_line => wv_sat_qsat_water, &
-     qsat_ice_line => wv_sat_qsat_ice, &
-     qsat_water => wv_sat_qsat_water_vect, &
-     qsat_ice => wv_sat_qsat_ice_vect
+     qsat_water => wv_sat_qsat_water, &
+     qsat_ice => wv_sat_qsat_ice
 
 ! Parameters from the utilities module.
 use micro_mg_utils, only: &
@@ -1043,100 +1041,78 @@ subroutine micro_mg_tend ( &
         ns(i,k) = nsn(i,k)
         qg(i,k) = qgr(i,k)
         ng(i,k) = ngr(i,k)
-     end do
-  end do
 
-  ! cldn: used to set cldm, unused for subcolumns
-  ! liqcldf: used to set lcldm, unused for subcolumns
-  ! icecldf: used to set icldm, unused for subcolumns
+        ! cldn: used to set cldm, unused for subcolumns
+        ! liqcldf: used to set lcldm, unused for subcolumns
+        ! icecldf: used to set icldm, unused for subcolumns
+      
+        if (microp_uniform) then
+           ! subcolumns, set cloud fraction variables to one
+           ! if cloud water or ice is present, if not present
+           ! set to mincld (mincld used instead of zero, to prevent
+           ! possible division by zero errors).
 
-  if (microp_uniform) then
-     ! subcolumns, set cloud fraction variables to one
-     ! if cloud water or ice is present, if not present
-     ! set to mincld (mincld used instead of zero, to prevent
-     ! possible division by zero errors).
+           if (qc(i,k) >= qsmall) then
+              lcldm(i,k) = 1._r8
+           else
+              lcldm(i,k) = mincld
+           end if
+ 
+           if (qi(i,k) >= qsmall) then
+              icldm(i,k) = 1._r8
+           else
+              icldm(i,k) = mincld
+           end if
+ 
+           cldm(i,k) = max(icldm(i,k), lcldm(i,k))
+           qsfm(i,k) = 1._r8
 
-     !$acc loop gang vector collapse(2)
-     do k=1,nlev
-       do i=1,mgncol
-          if (qc(i,k) >= qsmall) then
-             lcldm(i,k) = 1._r8
-          else
-             lcldm(i,k) = mincld
-          end if
-
-          if (qi(i,k) >= qsmall) then
-             icldm(i,k) = 1._r8
-          else
-             icldm(i,k) = mincld
-          end if
-
-          cldm(i,k) = max(icldm(i,k), lcldm(i,k))
-          qsfm(i,k) = 1._r8
-        end do
-     end do
-
-  else
-     ! get cloud fraction, check for minimum
-
-     !$acc loop gang vector collapse(2)
-     do k=1,nlev
-        do i=1,mgncol
-          cldm(i,k) = max(cldn(i,k),mincld)
-          lcldm(i,k) = max(liqcldf(i,k),mincld)
-          icldm(i,k) = max(icecldf(i,k),mincld)
-          qsfm(i,k) = qsatfac(i,k)
-        end do
-     end do
-  end if
+        else
+           ! get cloud fraction, check for minimum
+           cldm(i,k) = max(cldn(i,k),mincld)
+           lcldm(i,k) = max(liqcldf(i,k),mincld)
+           icldm(i,k) = max(icecldf(i,k),mincld)
+           qsfm(i,k) = qsatfac(i,k)
+        end if
 
   ! Initialize local variables
   ! local physical properties
 
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-    do i=1,mgncol
-       rho(i,k) = p(i,k)/(r*t(i,k))
-       dv(i,k) = 8.794E-5_r8 * t(i,k)**1.81_r8 / p(i,k)
-       mu(i,k) = 1.496E-6_r8 * t(i,k)**1.5_r8 / (t(i,k) + 120._r8)
-       sc(i,k) = mu(i,k)/(rho(i,k)*dv(i,k))
+        rho(i,k) = p(i,k)/(r*t(i,k))
+        dv(i,k) = 8.794E-5_r8 * t(i,k)**1.81_r8 / p(i,k)
+        mu(i,k) = 1.496E-6_r8 * t(i,k)**1.5_r8 / (t(i,k) + 120._r8)
+        sc(i,k) = mu(i,k)/(rho(i,k)*dv(i,k))
 
-       ! air density adjustment for fallspeed parameters
-       ! includes air density correction factor to the
-       ! power of 0.54 following Heymsfield and Bansemer 2007
+        ! air density adjustment for fallspeed parameters
+        ! includes air density correction factor to the
+        ! power of 0.54 following Heymsfield and Bansemer 2007
      
-       rhof(i,k)=(rhosu/rho(i,k))**0.54_r8
+        rhof(i,k)=(rhosu/rho(i,k))**0.54_r8
      
-       arn(i,k)=ar*rhof(i,k)
-       asn(i,k)=as*rhof(i,k)
-       ! Hail use ah*rhof graupel use ag*rhof
-       ! Note that do_hail and do_graupel can't both be true
-       if (do_hail) then
-          agn(i,k) = ah*rhof(i,k)
-       end if
-       if (do_graupel) then
-          agn(i,k) = ag*rhof(i,k)
-       end if
-       acn(i,k)=g*rhow/(18._r8*mu(i,k))
-       ain(i,k)=ai*(rhosu/rho(i,k))**0.35_r8
-       ajn(i,k)=aj*(rhosu/rho(i,k))**0.35_r8
-     end do
-  end do
-
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-     do i=1,mgncol
+        arn(i,k)=ar*rhof(i,k)
+        asn(i,k)=as*rhof(i,k)
+        ! Hail use ah*rhof graupel use ag*rhof
+        ! Note that do_hail and do_graupel can't both be true
+        if (do_hail) then
+           agn(i,k) = ah*rhof(i,k)
+        end if
+        if (do_graupel) then
+           agn(i,k) = ag*rhof(i,k)
+        end if
+        acn(i,k)=g*rhow/(18._r8*mu(i,k))
+        ain(i,k)=ai*(rhosu/rho(i,k))**0.35_r8
+        ajn(i,k)=aj*(rhosu/rho(i,k))**0.35_r8
 
   !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
   ! Get humidity and saturation vapor pressures
-        call qsat_water_line(t(i,k), p(i,k), esl(i,k), qvl(i,k), 1)
+        call qsat_water(t(i,k), p(i,k), esl(i,k), qvl(i,k), 1)
 
         ! make sure when above freezing that esi=esl, not active yet
         if (t(i,k) >= tmelt) then
            esi(i,k)=esl(i,k)
            qvi(i,k)=qvl(i,k)
         else
-           call qsat_ice_line(t(i,k), p(i,k), esi(i,k), qvi(i,k), 1)
+           call qsat_ice(t(i,k), p(i,k), esi(i,k), qvi(i,k), 1)
            ! Scale the water saturation values to reflect subgrid scale
            ! ice cloud fraction, where ice clouds begin forming at a
            ! gridbox average relative humidity of rhmini (not 1).
@@ -1150,14 +1126,8 @@ subroutine micro_mg_tend ( &
         end if
         relhum(i,k) = q(i,k) / max(qvl(i,k), qsmall)
 
-     end do
-  end do
-
   ! initialize microphysics output
 
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-     do i=1,mgncol
         qcsevap(i,k)=0._r8
         qisevap(i,k)=0._r8
         qvres(i,k)  =0._r8
@@ -1220,23 +1190,7 @@ subroutine micro_mg_tend ( &
         nmultg(i,k)=0._r8
         nmultrg(i,k)=0._r8
         npsacwg(i,k)=0._r8
-     end do
-  end do
 
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev+1
-     do i=1,mgncol
-        rflx(i,k)=0._r8
-        sflx(i,k)=0._r8
-        lflx(i,k)=0._r8
-        iflx(i,k)=0._r8
-        gflx(i,k)=0._r8
-     end do
-  end do
-
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-     do i=1,mgncol
         ! initialize precip output
         qrout(i,k)=0._r8
         qsout(i,k)=0._r8
@@ -1292,20 +1246,7 @@ subroutine micro_mg_tend ( &
         nsic(i,k)  = 0._r8
         nric(i,k)  = 0._r8
         ngic(i,k)  = 0._r8
-     end do
-  end do
 
-  ! initialize precip at surface
-
-  !$acc loop gang vector
-  do i=1,mgncol
-     prect(i)  = 0._r8
-     preci(i)  = 0._r8
-  end do
-
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-     do i=1,mgncol
         ! initialize precip fallspeeds to zero
         ums(i,k) = 0._r8
         uns(i,k) = 0._r8
@@ -1357,9 +1298,6 @@ subroutine micro_mg_tend ( &
         ncai(i,k)  = 0._r8
         nfice(i,k) = 0._r8
 
-     end do
-  end do
-
   !ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
   ! droplet activation
   ! get provisional droplet number after activation. This is used for
@@ -1372,9 +1310,6 @@ subroutine micro_mg_tend ( &
   ! output activated liquid and ice (convert from #/kg -> #/m3)
   !--------------------------------------------------
 
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-     do i=1,mgncol
         if (qc(i,k) >= qsmall) then
            nc(i,k) = max(nc(i,k) + npccn(i,k)*deltat, 0._r8)
            ncal(i,k) = nc(i,k)*rho(i,k)/lcldm(i,k) ! sghan minimum in #/cm3
@@ -1387,8 +1322,6 @@ subroutine micro_mg_tend ( &
         else
            ncai(i,k) = 0._r8
         end if 
-    end do
-  end do
 
   !===============================================
 
@@ -1400,10 +1333,7 @@ subroutine micro_mg_tend ( &
   ! the nucleation threshold should also be 1.05 and not rhmini + 0.05.
   !-------------------------------------------------------
 
-  if (do_cldice) then
-     !$acc loop gang vector collapse(2)
-     do k=1,nlev
-        do i=1,mgncol
+        if (do_cldice) then
            if (naai(i,k) > 0._r8 .and. t(i,k) < icenuct .and. &
               relhum(i,k)*esl(i,k)/esi(i,k) > 1.05_r8) then
 
@@ -1423,15 +1353,9 @@ subroutine micro_mg_tend ( &
               nimax(i,k)  = 0._r8
               mnuccd(i,k) = 0._r8
            end if
-        end do
-     end do
-  end if
+        end if
 
   !=============================================================================
-
-  !$acc loop gang vector collapse(2) private(dum,dum1)
-  do k=1,nlev
-     do i=1,mgncol
 
         ! calculate instantaneous precip processes (melting and homogeneous freezing)
         ! melting of snow at +2 C
@@ -1463,14 +1387,7 @@ subroutine micro_mg_tend ( &
            end if
         end if
 
-     end do
-  end do 
-
   ! melting of graupel at +2 C`
-
-  !$acc loop gang vector collapse(2) private(dum,dum1)
-  do k=1,nlev
-     do i=1,mgncol
 
         if (t(i,k) > snowmelt) then
            if (qg(i,k) > 0._r8) then
@@ -1500,12 +1417,6 @@ subroutine micro_mg_tend ( &
            end if
         end if
 
-     end do
-  end do 
-
-  !$acc loop gang vector collapse(2) private(dum,dum1)
-  do k=1,nlev
-    do i=1,mgncol
         ! freezing of rain at -5 C
         if (t(i,k) < rainfrze) then
            if (qr(i,k) > 0._r8) then
@@ -1541,12 +1452,7 @@ subroutine micro_mg_tend ( &
               end if
            end if
         end if
-     end do
-  end do 
 
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-    do i=1,mgncol
         ! obtain in-cloud values of cloud water/ice mixing ratios and number concentrations
         !-------------------------------------------------------
         ! for microphysical process calculations
@@ -1580,18 +1486,12 @@ subroutine micro_mg_tend ( &
            niic(i,k)=0._r8
         end if
 
-     end do
-  end do
-
   !========================================================================
 
   ! for sub-columns cldm has already been set to 1 if cloud
   ! water or ice is present, so precip_frac will be correctly set below
   ! and nothing extra needs to be done here
 
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-     do i=1,mgncol
         precip_frac(i,k) = cldm(i,k)
      end do
   end do
@@ -1627,6 +1527,25 @@ subroutine micro_mg_tend ( &
      end do
 
   endif
+
+  ! initialize precip at surface
+
+  !$acc loop gang vector
+  do i=1,mgncol
+     prect(i)  = 0._r8
+     preci(i)  = 0._r8
+  end do
+
+  !$acc loop gang vector collapse(2)
+  do k=1,nlev+1
+     do i=1,mgncol
+        rflx(i,k)=0._r8
+        sflx(i,k)=0._r8
+        lflx(i,k)=0._r8
+        iflx(i,k)=0._r8
+        gflx(i,k)=0._r8
+     end do
+  end do
   !$acc end parallel
 
   !ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
@@ -2279,7 +2198,7 @@ subroutine micro_mg_tend ( &
              ((prds(i,k)+prdg(i,k))*precip_frac(i,k)+vap_dep(i,k)+ice_sublim(i,k)+mnuccd(i,k))*xxls)*deltat/cpp
 
         ! use rhw to allow ice supersaturation
-        call qsat_water_line(ttmpA(i,k), p(i,k), esnA(i,k), qvnAI(i,k), 1)
+        call qsat_water(ttmpA(i,k), p(i,k), esnA(i,k), qvnAI(i,k), 1)
 
         if ((pre(i,k)+prds(i,k)+prdg(i,k))*precip_frac(i,k)+ice_sublim(i,k) < -1.e-20_r8) then
            ! modify ice/precip evaporation rate if q > qsat
@@ -2294,7 +2213,7 @@ subroutine micro_mg_tend ( &
         end if
 
         ! use rhw to allow ice supersaturation
-        call qsat_water_line(ttmpA(i,k), p(i,k), esnA(i,k), qvnA(i,k), 1)
+        call qsat_water(ttmpA(i,k), p(i,k), esnA(i,k), qvnA(i,k), 1)
 
         if ((pre(i,k)+prds(i,k)+prdg(i,k))*precip_frac(i,k)+ice_sublim(i,k) < -1.e-20_r8) then
            ! modify ice/precip evaporation rate if q > qsat
@@ -2307,7 +2226,7 @@ subroutine micro_mg_tend ( &
         end if
 
         ! do separately using RHI for prds and ice_sublim
-        call qsat_ice_line(ttmpA(i,k), p(i,k), esnA(i,k), qvnA(i,k), 1)
+        call qsat_ice(ttmpA(i,k), p(i,k), esnA(i,k), qvnA(i,k), 1)
 
         if ((pre(i,k)+prds(i,k)+prdg(i,k))*precip_frac(i,k)+ice_sublim(i,k) < -1.e-20_r8) then
            ! modify ice/precip evaporation rate if q > qsat
@@ -3028,7 +2947,7 @@ subroutine micro_mg_tend ( &
            ttmpA(i,k)=t(i,k)+tlat(i,k)/cpp*deltat
 
            ! use rhw to allow ice supersaturation
-           call qsat_water_line(ttmpA(i,k), p(i,k), esnA(i,k), qvnA(i,k), 1)
+           call qsat_water(ttmpA(i,k), p(i,k), esnA(i,k), qvnA(i,k), 1)
 
            if (dum_2D(i,k) > qvnA(i,k) .and. qvnA(i,k) > 0 .and. allow_sed_supersat) then
               ! expression below is approximate since there may be ice deposition
