@@ -193,8 +193,6 @@ function wv_sat_svp_to_qsat(es, p) result(qs)
   real(r8), intent(in) :: p   ! Current pressure.
   real(r8)             :: qs
 
-!$acc update device (epsilo,omeps)
-
 !$acc data present (es,p)
 
   ! If pressure is less than SVP, set qs to maximum of 1.
@@ -219,8 +217,6 @@ subroutine  wv_sat_svp_to_qsat_vect(es, p, qs, vlen)
   integer :: i
 
   ! If pressure is less than SVP, set qs to maximum of 1.
-
-  !$acc update device (epsilo, omeps)
 
   !$acc data present (es,p,qs)
 
@@ -413,8 +409,6 @@ function wv_sat_svp_water(t, idx) result(es)
 
   integer :: use_idx
 
-!$acc update device (default_idx)
-
 !$acc data present (t)
 
   if (present(idx)) then
@@ -474,8 +468,6 @@ function wv_sat_svp_ice(t, idx) result(es)
   real(r8)              :: es
 
   integer :: use_idx
-
-!$acc update device (default_idx)
 
 !$acc data present (t)
 
@@ -539,8 +531,6 @@ function wv_sat_svp_trans(t, idx) result(es)
   real(r8) :: esice      ! Saturation vapor pressure over ice
   real(r8) :: weight     ! Intermediate scratch variable for es transition
 
-!$acc update device (tmelt,ttrice)
-
 !$acc data present (t)
 
 !
@@ -584,8 +574,6 @@ function GoffGratch_svp_water(t) result(es)
   real(r8), intent(in) :: t  ! Temperature in Kelvin
   real(r8) :: es             ! SVP in Pa
 
-!$acc update device (tboil)
-
 !$acc data present (t)
 
   ! uncertain below -70 C
@@ -605,8 +593,6 @@ subroutine GoffGratch_svp_water_vect(t, es, vlen)
   real(r8), intent(out) :: es(vlen) ! SVP in Pa
   integer :: i
   ! uncertain below -70 C
-
-  !$acc update device (tboil)
 
   !$acc data present (t,es)
 
@@ -631,8 +617,6 @@ function GoffGratch_svp_ice(t) result(es)
   real(r8), intent(in) :: t  ! Temperature in Kelvin
   real(r8) :: es             ! SVP in Pa
 
-!$acc update device (h2otrip)
-
 !$acc data present (t)
 
   ! good down to -100 C
@@ -650,8 +634,6 @@ subroutine GoffGratch_svp_ice_vect(t, es, vlen)
   real(r8), intent(out) :: es(vlen)             ! SVP in Pa
   integer :: i
   ! good down to -100 C
-
-  !$acc update device (h2otrip)
 
   !$acc data present (t,es)
 
@@ -771,8 +753,6 @@ function OldGoffGratch_svp_water(t) result(es)
   real(r8) :: es
   real(r8) :: ps, e1, e2, f1, f2, f3, f4, f5, f
 
-!$acc update device (tboil)
-
 !$acc data present (t)
 
   ps = 1013.246_r8
@@ -798,8 +778,6 @@ subroutine OldGoffGratch_svp_water_vect(t,es,vlen)
 
   real(r8), dimension(vlen) :: ps, e1, e2, f1, f2, f3, f4, f5, f
   integer :: i
-
-  !$acc update device (tboil)
 
   !$acc enter data create (ps,e1,e2,f1,f2,f3,f4,f5,f)
 
@@ -832,8 +810,6 @@ function OldGoffGratch_svp_ice(t) result(es)
   real(r8) :: es
   real(r8) :: term1, term2, term3
 
-!$acc update device (tmelt)
-
 !$acc data present (t)
 
   term1 = 2.01889049_r8/(tmelt/t)
@@ -853,8 +829,6 @@ subroutine OldGoffGratch_svp_ice_vect(t,es,vlen)
   
   real(r8), dimension(vlen) :: term1, term2, term3
   integer :: i
-
-  !$acc update device (tmelt)
 
   !$acc enter data create  (term1,term2,term3)
   
@@ -893,8 +867,6 @@ function Bolton_svp_water(t) result(es)
   real(r8), intent(in) :: t  ! Temperature in Kelvin
   real(r8) :: es             ! SVP in Pa
 
-!$acc update device (tmelt)
-
 !$acc data present (t)
 
   es = c1*exp( (c2*(t - tmelt))/((t - tmelt)+c3) )
@@ -913,8 +885,6 @@ subroutine Bolton_svp_water_vect(t, es,vlen)
   real(r8), intent(out) :: es(vlen)             ! SVP in Pa
 
   integer :: i
-
-  !$acc update device (tmelt)
 
   !$acc data present (t,es)
 
