@@ -3374,14 +3374,9 @@ subroutine micro_mg_tend ( &
            freqr(i,k) = 0._r8
            reff_rain(i,k) = 0._r8
         end if
-    end do
-  end do
 
   ! avoid divide by zero in avg_diameter_vec
 
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-     do i=1,mgncol
         if (nsout(i,k) .eq. 0._r8) nsout(i,k) = 1.e-34_r8
      end do
   end do
@@ -3390,10 +3385,6 @@ subroutine micro_mg_tend ( &
   ! The avg_diameter_vec call does the actual calculation; other diameter
   ! outputs are just dsout2 times constants.
   call avg_diameter_vec(qsout, nsout, rho, rhosn,dsout2,mgncol*nlev)
-
-  !!call t_stopf ('micro_mg3_avg_diameter_vec')
-
-  call nvtxStartRange("mg3_bigkernel", 1)
 
   !$acc parallel vector_length(VLEN) default(present) 
   !$acc loop gang vector collapse(2)
@@ -3413,30 +3404,17 @@ subroutine micro_mg_tend ( &
            freqs(i,k)  = 0._r8
            reff_snow(i,k)=0._r8
         end if 
-    end do
-  end do
 
   ! avoid divide by zero in avg_diameter_vec
 
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-     do i=1,mgncol
         if (ngout(i,k) .eq. 0._r8) ngout(i,k) = 1.e-34_r8
     end do
   end do
   !$acc end parallel
 
-  call nvtxEndRange
-
-  !!call t_startf ('micro_mg3_avg_diameter_vec')
-
   ! The avg_diameter_vec call does the actual calculation; other diameter
   ! outputs are just dsout2 times constants.
   call avg_diameter_vec(qgout, ngout, rho, rhogtmp,dgout2,mgncol*nlev)
-
-  !!call t_stopf ('micro_mg3_avg_diameter_vec')
-
-  call nvtxStartRange("mg3_bigkernel", 1)
 
   !$acc parallel vector_length(VLEN) default(present) 
   !$acc loop gang vector collapse(2)
@@ -3456,8 +3434,6 @@ subroutine micro_mg_tend ( &
            freqg(i,k)  = 0._r8
            reff_grau(i,k)=0._r8
         end if 
-    end do
-  end do
 
   ! analytic radar reflectivity
   !--------------------------------------------------
@@ -3465,9 +3441,6 @@ subroutine micro_mg_tend ( &
   ! *****note: radar reflectivity is local (in-precip average)
   ! units of mm^6/m^3
 
-  !$acc loop gang vector collapse(2) private(dum,dum1)
-  do k=1,nlev
-     do i = 1,mgncol
         if (qc(i,k).ge.qsmall .and. (nc(i,k)+nctend(i,k)*deltat).gt.10._r8) then
            dum=(qc(i,k)/lcldm(i,k)*rho(i,k)*1000._r8)**2 &
                 /(0.109_r8*(nc(i,k)+nctend(i,k)*deltat)/lcldm(i,k)*rho(i,k)/1.e6_r8)*lcldm(i,k)/precip_frac(i,k)
@@ -3537,14 +3510,8 @@ subroutine micro_mg_tend ( &
            fcsrfl(i,k)=0._r8
         end if
 
-     end do
-  end do
-
   !redefine fice here....
 
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-    do i=1,mgncol
        dum_2D(i,k) = qsout(i,k) + qrout(i,k) + qc(i,k) + qi(i,k)
        dumi(i,k) = qsout(i,k) + qi(i,k)
        if (dumi(i,k) .gt. qsmall .and. dum_2D(i,k) .gt. qsmall) then
@@ -3555,8 +3522,6 @@ subroutine micro_mg_tend ( &
      end do
   end do
   !$acc end parallel
-
-  call nvtxEndRange
 
 !$acc end data 
 
