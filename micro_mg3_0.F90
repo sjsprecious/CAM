@@ -2955,20 +2955,8 @@ subroutine micro_mg_tend ( &
           end if
        end if
 
-     end do
-  end do
-  !$acc end parallel
+       if (do_cldice) then
 
-  !!call t_stopf ('micro_mg3_misc')
-
-  if (do_cldice) then
-
-     call nvtxStartRange("mg3_bigkernel", 1)
-
-     !$acc parallel vector_length(VLEN) default(present)
-     !$acc loop gang vector collapse(2) private(dum)
-     do k=1,nlev
-        do i=1,mgncol
            if (t(i,k)+tlat(i,k)/cpp*deltat > tmelt) then
               if (dumi(i,k) > 0._r8) then
 
@@ -3000,15 +2988,10 @@ subroutine micro_mg_tend ( &
                  tlat(i,k)=tlat(i,k)-xlf*dum*dumi(i,k)*rdeltat
               end if
            end if
-        end do
-     end do
 
      ! homogeneously freeze droplets at -40 C
      !-----------------------------------------------------------------
 
-     !$acc loop gang vector collapse(2) private(dum)
-     do k=1,nlev
-        do i=1,mgncol
            if (t(i,k)+tlat(i,k)/cpp*deltat < 233.15_r8) then
               if (dumc(i,k) > 0._r8) then
 
@@ -3035,38 +3018,18 @@ subroutine micro_mg_tend ( &
                  tlat(i,k)=tlat(i,k)+xlf*dum*dumc(i,k)*rdeltat
               end if
            end if
-        end do 
-     end do 
 
      ! remove any excess over-saturation, which is possible due to non-linearity when adding
      ! together all microphysical processes
      !-----------------------------------------------------------------
      ! follow code similar to old CAM scheme
 
-     !$acc loop gang vector collapse(2)
-     do k=1,nlev
-        do i=1,mgncol
            dum_2D(i,k)=q(i,k)+qvlat(i,k)*deltat
            ttmpA(i,k)=t(i,k)+tlat(i,k)/cpp*deltat
-        end do
-     end do
-     !$acc end parallel
 
-     call nvtxEndRange 
+           ! use rhw to allow ice supersaturation
+           call qsat_water_line(ttmpA(i,k), p(i,k), esnA(i,k), qvnA(i,k), 1)
 
-     !!call t_startf ('micro_mg3_qsat')
-
-     ! use rhw to allow ice supersaturation
-     call qsat_water(ttmpA, p, esnA, qvnA, mgncol*nlev)
-
-     !!call t_stopf ('micro_mg3_qsat')
-
-     !!call t_startf ('micro_mg3_misc')
-
-     !$acc parallel vector_length(VLEN) default(present)
-     !$acc loop gang vector collapse(2) private(dum,dum1)
-     do k=1,nlev
-        do i=1,mgncol
            if (dum_2D(i,k) > qvnA(i,k) .and. qvnA(i,k) > 0 .and. allow_sed_supersat) then
               ! expression below is approximate since there may be ice deposition
               dum = (dum_2D(i,k)-qvnA(i,k))/(1._r8+xxlv_squared*qvnA(i,k)/(cpp*rv*ttmpA(i,k)**2))*rdeltat
@@ -3095,13 +3058,8 @@ subroutine micro_mg_tend ( &
               qvres(i,k)=-dum
               tlat(i,k)=tlat(i,k)+dum*(1._r8-dum1)*xxlv+dum*dum1*xxls
            end if
-        end do 
-     end do 
-     !$acc end parallel
 
-     !!call t_stopf ('micro_mg3_misc')
-
-  end if
+       end if
 
   ! calculate effective radius for pass to radiation code
   !=========================================================
@@ -3111,51 +3069,43 @@ subroutine micro_mg_tend ( &
   ! update cloud variables after instantaneous processes to get effective radius
   ! variables are in-cloud to calculate size dist parameters
 
-  !!call t_startf ('micro_mg3_misc')
+       dumc(i,k) = max(qc(i,k)+qctend(i,k)*deltat,0._r8)/lcldm(i,k)
+       dumi(i,k) = max(qi(i,k)+qitend(i,k)*deltat,0._r8)/icldm(i,k)
+       dumnc(i,k) = max(nc(i,k)+nctend(i,k)*deltat,0._r8)/lcldm(i,k)
+       dumni(i,k) = max(ni(i,k)+nitend(i,k)*deltat,0._r8)/icldm(i,k)
 
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-     do i=1,mgncol
-        dumc(i,k) = max(qc(i,k)+qctend(i,k)*deltat,0._r8)/lcldm(i,k)
-        dumi(i,k) = max(qi(i,k)+qitend(i,k)*deltat,0._r8)/icldm(i,k)
-        dumnc(i,k) = max(nc(i,k)+nctend(i,k)*deltat,0._r8)/lcldm(i,k)
-        dumni(i,k) = max(ni(i,k)+nitend(i,k)*deltat,0._r8)/icldm(i,k)
+       dumr(i,k) = max(qr(i,k)+qrtend(i,k)*deltat,0._r8)/precip_frac(i,k)
+       dumnr(i,k) = max(nr(i,k)+nrtend(i,k)*deltat,0._r8)/precip_frac(i,k)
+       dums(i,k) = max(qs(i,k)+qstend(i,k)*deltat,0._r8)/precip_frac(i,k)
+       dumns(i,k) = max(ns(i,k)+nstend(i,k)*deltat,0._r8)/precip_frac(i,k)
+       dumg(i,k) = max(qg(i,k)+qgtend(i,k)*deltat,0._r8)
+       dumng(i,k) = max(ng(i,k)+ngtend(i,k)*deltat,0._r8)
 
-        dumr(i,k) = max(qr(i,k)+qrtend(i,k)*deltat,0._r8)/precip_frac(i,k)
-        dumnr(i,k) = max(nr(i,k)+nrtend(i,k)*deltat,0._r8)/precip_frac(i,k)
-        dums(i,k) = max(qs(i,k)+qstend(i,k)*deltat,0._r8)/precip_frac(i,k)
-        dumns(i,k) = max(ns(i,k)+nstend(i,k)*deltat,0._r8)/precip_frac(i,k)
-        dumg(i,k) = max(qg(i,k)+qgtend(i,k)*deltat,0._r8)
-        dumng(i,k) = max(ng(i,k)+ngtend(i,k)*deltat,0._r8)
+       ! switch for specification of droplet and crystal number
+       if (nccons) then
+          dumnc(i,k)=ncnst/rho(i,k)
+       end if
 
-        ! switch for specification of droplet and crystal number
-        if (nccons) then
-           dumnc(i,k)=ncnst/rho(i,k)
-        end if
+       ! switch for specification of cloud ice number
+       if (nicons) then
+          dumni(i,k)=ninst/rho(i,k)
+       end if
 
-        ! switch for specification of cloud ice number
-        if (nicons) then
-           dumni(i,k)=ninst/rho(i,k)
-        end if
+       ! switch for specification of graupel number
+       if (ngcons) then
+          dumng(i,k)=ngnst/rho(i,k)*precip_frac(i,k)
+       end if
 
-        ! switch for specification of graupel number
-        if (ngcons) then
-           dumng(i,k)=ngnst/rho(i,k)*precip_frac(i,k)
-        end if
-
-        ! limit in-cloud mixing ratio to reasonable value of 5 g kg-1
-        dumc(i,k)=min(dumc(i,k),5.e-3_r8)
-        dumi(i,k)=min(dumi(i,k),5.e-3_r8)
-        ! limit in-precip mixing ratios
-        dumr(i,k)=min(dumr(i,k),10.e-3_r8)
-        dums(i,k)=min(dums(i,k),10.e-3_r8)
-        dumg(i,k)=min(dumg(i,k),10.e-3_r8)
+       ! limit in-cloud mixing ratio to reasonable value of 5 g kg-1
+       dumc(i,k)=min(dumc(i,k),5.e-3_r8)
+       dumi(i,k)=min(dumi(i,k),5.e-3_r8)
+       ! limit in-precip mixing ratios
+       dumr(i,k)=min(dumr(i,k),10.e-3_r8)
+       dums(i,k)=min(dums(i,k),10.e-3_r8)
+       dumg(i,k)=min(dumg(i,k),10.e-3_r8)
      end do
   end do
   !$acc end parallel
-
-  !!call t_stopf ('micro_mg3_misc')
 
   ! cloud ice effective radius
   !-----------------------------------------------------------------
@@ -3292,10 +3242,6 @@ subroutine micro_mg_tend ( &
   ! size distribution subroutine.
   call size_dist_param_liq_vect(mg_liq_props, dumc, dumnc, rho, pgam, lamc, mgncol*nlev)
 
-  !!call t_stopf ('micro_mg3_size_dist_param_liq_vect')
-
-  call nvtxStartRange("mg3_bigkernel", 1)
-
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2)
   do k =1,nlev
@@ -3308,29 +3254,15 @@ subroutine micro_mg_tend ( &
            pgamrad(i,k)=0._r8
            effc_fn(i,k) = 10._r8
         end if
-     end do
-  end do
 
-  ! recalculate 'final' rain size distribution parameters
-  ! to ensure that rain size is in bounds, adjust rain number if needed
-
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-     do i=1,mgncol
+        ! recalculate 'final' rain size distribution parameters
+        ! to ensure that rain size is in bounds, adjust rain number if needed
         dum_2D(i,k) = dumnr(i,k)
      end do
   end do
   !$acc end parallel
 
-  call nvtxEndRange
-
-  !!call t_startf ('micro_mg3_size_dist_param_basic_vect')
-
   call size_dist_param_basic_vect(mg_rain_props, dumr, dumnr, lamr, mgncol*nlev)
-
-  !!call t_stopf ('micro_mg3_size_dist_param_basic_vect')
-
-  call nvtxStartRange("mg3_bigkernel", 1)
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2)
@@ -3342,29 +3274,15 @@ subroutine micro_mg_tend ( &
               nrtend(i,k)=(dumnr(i,k)*precip_frac(i,k)-nr(i,k))*rdeltat
            end if
         end if
-     end do
-  end do
 
-  ! recalculate 'final' snow size distribution parameters
-  ! to ensure that snow size is in bounds, adjust snow number if needed
-
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-     do i=1,mgncol
+        ! recalculate 'final' snow size distribution parameters
+        ! to ensure that snow size is in bounds, adjust snow number if needed
         dum_2D(i,k) = dumns(i,k)
      end do
   end do
   !$acc end parallel
 
-  call nvtxEndRange
-
-  !!call t_startf ('micro_mg3_size_dist_param_basic_vect')
-
   call size_dist_param_basic_vect(mg_snow_props, dums, dumns, lams, mgncol*nlev, n0=dumns0A2D)
-
-  !!call t_stopf ('micro_mg3_size_dist_param_basic_vect')
-
-  call nvtxStartRange("mg3_bigkernel", 1)
 
   !$acc parallel vector_length(VLEN) default(present) 
   !$acc loop gang vector collapse(2)
@@ -3377,23 +3295,13 @@ subroutine micro_mg_tend ( &
            end if
            sadsnow(i,k) = 2._r8*pi*(lams(i,k)**(-3))*dumns0A2D(i,k)*rho(i,k)*1.e-2_r8  ! m2/m3 -> cm2/cm3
         end if
-     end do ! vertical k loop
-  end do
 
-  ! recalculate 'final' graupel size distribution parameters
-  ! to ensure that  size is in bounds, addjust number if needed
-
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-     do i=1,mgncol
+        ! recalculate 'final' graupel size distribution parameters
+        ! to ensure that  size is in bounds, addjust number if needed
         dum_2D(i,k) = dumng(i,k)
      end do
   end do
   !$acc end parallel
-
-  call nvtxEndRange
-
-  !!call t_startf ('micro_mg3_size_dist_param_basic_vect')
 
   if (do_hail) then
      call size_dist_param_basic_vect(mg_hail_props, dumg, dumng, lamg, mgncol*nlev)
@@ -3401,10 +3309,6 @@ subroutine micro_mg_tend ( &
   if (do_graupel) then
      call size_dist_param_basic_vect(mg_graupel_props, dumg, dumng, lamg, mgncol*nlev)
   end if
-
-  !!call t_stopf ('micro_mg3_size_dist_param_basic_vect')
-
-  call nvtxStartRange("mg3_bigkernel", 1)
 
   !$acc parallel vector_length(VLEN) default(present) 
   !$acc loop gang vector collapse(2)
@@ -3416,12 +3320,7 @@ subroutine micro_mg_tend ( &
               ngtend(i,k)=(dumng(i,k)*precip_frac(i,k)-ng(i,k))*rdeltat
            end if
         end if
-     end do
-  end do
 
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-     do i=1,mgncol
         ! if updated q (after microphysics) is zero, then ensure updated n is also zero
         !=================================================================================
         if (qc(i,k)+qctend(i,k)*deltat.lt.qsmall) nctend(i,k)=-nc(i,k)*rdeltat
@@ -3437,8 +3336,6 @@ subroutine micro_mg_tend ( &
         ! so add qctend and qitend back in one more time
         qc(i,k) = qc(i,k) + qctend(i,k)*deltat
         qi(i,k) = qi(i,k) + qitend(i,k)*deltat
-     end do
-  end do
 
   ! averaging for snow and rain number and diameter
   !--------------------------------------------------
@@ -3452,25 +3349,14 @@ subroutine micro_mg_tend ( &
 
   ! avoid divide by zero in avg_diameter_vec
 
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-     do i=1,mgncol
         if (nrout(i,k) .eq. 0._r8) nrout(i,k)=1.e-34_r8
      end do
   end do
   !$acc end parallel
 
-  call nvtxEndRange
-
-  !!call t_startf ('micro_mg3_avg_diameter_vec')
-
   ! The avg_diameter_vec call does the actual calculation; other diameter
   ! outputs are just drout2 times constants.
   call avg_diameter_vec(qrout,nrout,rho,rhow,drout2,mgncol*nlev)
-
-  !!call t_stopf ('micro_mg3_avg_diameter_vec')
-
-  call nvtxStartRange("mg3_bigkernel", 1)
 
   !$acc parallel vector_length(VLEN) default(present) 
   !$acc loop gang vector collapse(2)
@@ -3500,10 +3386,6 @@ subroutine micro_mg_tend ( &
      end do
   end do
   !$acc end parallel
-
-  call nvtxEndRange
-
-  !!call t_startf ('micro_mg3_avg_diameter_vec')
 
   ! The avg_diameter_vec call does the actual calculation; other diameter
   ! outputs are just dsout2 times constants.
