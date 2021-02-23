@@ -3097,71 +3097,66 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    if (micro_mg_version > 1) then
       ! Prognostic precipitation
 
-      where (qr_grid(:ngrdcol,top_lev:) >= 1.e-7_r8)
-         drout2_grid(:ngrdcol,top_lev:) = avg_diameter( &
-              qr_grid(:ngrdcol,top_lev:), &
-              nr_grid(:ngrdcol,top_lev:) * rho_grid(:ngrdcol,top_lev:), &
-              rho_grid(:ngrdcol,top_lev:), rhow)
+      do k = top_lev, nlev
+         do i = 1, ngrdcol
+            if (qr_grid(i,k) >= 1.e-7_r8 ) then
+               drout2_grid(i,k) = avg_diameter( qr_grid(i,k), nr_grid(i,k) * rho_grid(i,k), &
+                                                rho_grid(i,k), rhow)
+               reff_rain_grid(i,k) = drout2_grid(i,k) * 1.5_r8 * 1.e6_r8
+            end if
+         end do
+      end do
 
-         reff_rain_grid(:ngrdcol,top_lev:) = drout2_grid(:ngrdcol,top_lev:) * &
-              1.5_r8 * 1.e6_r8
-      end where
-
-      where (qs_grid(:ngrdcol,top_lev:) >= 1.e-7_r8)
-         dsout2_grid(:ngrdcol,top_lev:) = avg_diameter( &
-              qs_grid(:ngrdcol,top_lev:), &
-              ns_grid(:ngrdcol,top_lev:) * rho_grid(:ngrdcol,top_lev:), &
-              rho_grid(:ngrdcol,top_lev:), rhosn)
-
-         des_grid(:ngrdcol,top_lev:) = dsout2_grid(:ngrdcol,top_lev:) *&
-              3._r8 * rhosn/rhows
-
-         reff_snow_grid(:ngrdcol,top_lev:) = dsout2_grid(:ngrdcol,top_lev:) * &
-              1.5_r8 * 1.e6_r8
-      end where
+      do k = top_lev, nlev
+         do i = 1, ngrdcol
+            if (qs_grid(i,k) >= 1.e-7_r8) then
+               dsout2_grid(i,k) = avg_diameter( qs_grid(i,k), ns_grid(i,k) * rho_grid(i,k), &
+                                                rho_grid(i,k), rhosn)
+               des_grid(i,k) = dsout2_grid(i,k) * 3._r8 * rhosn/rhows
+               reff_snow_grid(i,k) = dsout2_grid(i,k) * 1.5_r8 * 1.e6_r8
+            end if
+         end do
+      end do
 
    else
       ! Diagnostic precipitation
 
-      where (qrout_grid(:ngrdcol,top_lev:) >= 1.e-7_r8)
-         drout2_grid(:ngrdcol,top_lev:) = avg_diameter( &
-              qrout_grid(:ngrdcol,top_lev:), &
-              nrout_grid(:ngrdcol,top_lev:) * rho_grid(:ngrdcol,top_lev:), &
-              rho_grid(:ngrdcol,top_lev:), rhow)
+      do k = top_lev, nlev
+         do i = 1, ngrdcol
+            if (qrout_grid(i,k) >= 1.e-7_r8) then
+               drout2_grid(i,k) = avg_diameter( qrout_grid(i,k), nrout_grid(i,k) * rho_grid(i,k), &
+                                                rho_grid(i,k), rhow )
+               reff_rain_grid(i,k) = drout2_grid(i,k) * 1.5_r8 * 1.e6_r8
+            end if
+         end do
+      end do
 
-         reff_rain_grid(:ngrdcol,top_lev:) = drout2_grid(:ngrdcol,top_lev:) * &
-              1.5_r8 * 1.e6_r8
-      end where
-
-      where (qsout_grid(:ngrdcol,top_lev:) >= 1.e-7_r8)
-         dsout2_grid(:ngrdcol,top_lev:) = avg_diameter( &
-              qsout_grid(:ngrdcol,top_lev:), &
-              nsout_grid(:ngrdcol,top_lev:) * rho_grid(:ngrdcol,top_lev:), &
-              rho_grid(:ngrdcol,top_lev:), rhosn)
-
-         des_grid(:ngrdcol,top_lev:) = dsout2_grid(:ngrdcol,top_lev:) &
-              * 3._r8 * rhosn/rhows
-
-         reff_snow_grid(:ngrdcol,top_lev:) = &
-              dsout2_grid(:ngrdcol,top_lev:) * 1.5_r8 * 1.e6_r8
-      end where
+      do k = top_lev, nlev
+         do i = 1, ngrdcol
+            if (qsout_grid(i,k) >= 1.e-7_r8) then
+               dsout2_grid(i,k) = avg_diameter( qsout_grid(i,k), nsout_grid(i,k) * rho_grid(i,k), &
+                                                rho_grid(i,k), rhosn)
+               des_grid(i,k) = dsout2_grid(i,k) * 3._r8 * rhosn/rhows
+               reff_snow_grid(i,k) = dsout2_grid(i,k) * 1.5_r8 * 1.e6_r8
+            end if
+         end do
+      end do
 
    end if
 
 ! Graupel/Hail size distribution Placeholder
    if (micro_mg_version > 2) then
       degrau_grid = 0._r8
-      where (qg_grid(:ngrdcol,top_lev:) >= 1.e-7_r8)
-         dgout2_grid(:ngrdcol,top_lev:) = avg_diameter( &
-              qg_grid(:ngrdcol,top_lev:), &
-              ng_grid(:ngrdcol,top_lev:) * rho_grid(:ngrdcol,top_lev:), &
-              rho_grid(:ngrdcol,top_lev:), rhog)
-      
-         reff_grau_grid(:ngrdcol,top_lev:) = dgout2_grid(:ngrdcol,top_lev:) * &
-              1.5_r8 * 1.e6_r8
-         degrau_grid(:ngrdcol,top_lev:) = dgout2_grid(:ngrdcol,top_lev:) *&
-              3._r8 * rhog/rhows
-      end where
+      do k = top_lev, nlev
+         do i = 1, ngrdcol
+            if (qg_grid(i,k) >= 1.e-7_r8) then
+               dgout2_grid(i,k) = avg_diameter( qg_grid(i,k), ng_grid(i,k) * rho_grid(i,k), &
+                                                rho_grid(i,k), rhog )
+               reff_grau_grid(i,k) = dgout2_grid(i,k) * 1.5_r8 * 1.e6_r8
+               degrau_grid(i,k) = dgout2_grid(i,k) * 3._r8 * rhog/rhows
+            end if
+         end do
+      end do
    end if
 
    ! Effective radius and diameter for cloud ice.

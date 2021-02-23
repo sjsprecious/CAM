@@ -473,7 +473,6 @@ subroutine micro_mg_tend ( &
        size_dist_param_liq, &
        size_dist_param_basic, &
        avg_diameter, &
-       avg_diameter_vec, &
        size_dist_param_liq_vect, &
        size_dist_param_basic_vect
 
@@ -3256,31 +3255,24 @@ subroutine micro_mg_tend ( &
         qc(i,k) = qc(i,k) + qctend(i,k)*deltat
         qi(i,k) = qi(i,k) + qitend(i,k)*deltat
 
-  ! averaging for snow and rain number and diameter
-  !--------------------------------------------------
+        ! averaging for snow and rain number and diameter
+        !--------------------------------------------------
 
-  ! drout2/dsout2:
-  ! diameter of rain and snow
-  ! dsout:
-  ! scaled diameter of snow (passed to radiation in CAM)
-  ! reff_rain/reff_snow:
-  ! calculate effective radius of rain and snow in microns for COSP using Eq. 9 of COSP v1.3 manual
+        ! drout2/dsout2:
+        ! diameter of rain and snow
+        ! dsout:
+        ! scaled diameter of snow (passed to radiation in CAM)
+        ! reff_rain/reff_snow:
+        ! calculate effective radius of rain and snow in microns for COSP using Eq. 9 of COSP v1.3 manual
 
-  ! avoid divide by zero in avg_diameter_vec
+        ! avoid divide by zero in avg_diameter_vec
 
         if (nrout(i,k) .eq. 0._r8) nrout(i,k)=1.e-34_r8
-     end do
-  end do
-  !$acc end parallel
 
-  ! The avg_diameter_vec call does the actual calculation; other diameter
-  ! outputs are just drout2 times constants.
-  call avg_diameter_vec(qrout,nrout,rho,rhow,drout2,mgncol*nlev)
+        ! The avg_diameter_vec call does the actual calculation; other diameter
+        ! outputs are just drout2 times constants.
+        drout2(i,k) = avg_diameter(qrout(i,k), nrout(i,k), rho(i,k), rhow)
 
-  !$acc parallel vector_length(VLEN) default(present) 
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-     do i=1,mgncol
         if (qrout(i,k) .gt. 1.e-7_r8 .and. nrout(i,k) .gt. 0._r8) then
            qrout2(i,k) = qrout(i,k) * precip_frac(i,k)
            nrout2(i,k) = nrout(i,k) * precip_frac(i,k)
@@ -3294,21 +3286,13 @@ subroutine micro_mg_tend ( &
            reff_rain(i,k) = 0._r8
         end if
 
-  ! avoid divide by zero in avg_diameter_vec
-
+        ! avoid divide by zero in avg_diameter_vec
         if (nsout(i,k) .eq. 0._r8) nsout(i,k) = 1.e-34_r8
-     end do
-  end do
-  !$acc end parallel
 
-  ! The avg_diameter_vec call does the actual calculation; other diameter
-  ! outputs are just dsout2 times constants.
-  call avg_diameter_vec(qsout, nsout, rho, rhosn,dsout2,mgncol*nlev)
+        ! The avg_diameter_vec call does the actual calculation; other diameter
+        ! outputs are just dsout2 times constants.
+        dsout2(i,k) = avg_diameter(qsout(i,k), nsout(i,k), rho(i,k), rhosn)
 
-  !$acc parallel vector_length(VLEN) default(present) 
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-     do i=1,mgncol
         if (qsout(i,k) .gt. 1.e-7_r8 .and. nsout(i,k) .gt. 0._r8) then
            qsout2(i,k) = qsout(i,k) * precip_frac(i,k)
            nsout2(i,k) = nsout(i,k) * precip_frac(i,k)
@@ -3324,21 +3308,13 @@ subroutine micro_mg_tend ( &
            reff_snow(i,k)=0._r8
         end if 
 
-  ! avoid divide by zero in avg_diameter_vec
-
+        ! avoid divide by zero in avg_diameter_vec
         if (ngout(i,k) .eq. 0._r8) ngout(i,k) = 1.e-34_r8
-    end do
-  end do
-  !$acc end parallel
 
-  ! The avg_diameter_vec call does the actual calculation; other diameter
-  ! outputs are just dsout2 times constants.
-  call avg_diameter_vec(qgout, ngout, rho, rhogtmp,dgout2,mgncol*nlev)
+        ! The avg_diameter_vec call does the actual calculation; other diameter
+        ! outputs are just dsout2 times constants.
+        dgout2(i,k) = avg_diameter(qgout(i,k), ngout(i,k), rho(i,k), rhogtmp)
 
-  !$acc parallel vector_length(VLEN) default(present) 
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-     do i=1,mgncol
         if (qgout(i,k) .gt. 1.e-7_r8 .and. ngout(i,k) .gt. 0._r8) then
            qgout2(i,k) = qgout(i,k) * precip_frac(i,k)
            ngout2(i,k) = ngout(i,k) * precip_frac(i,k)
@@ -3354,11 +3330,11 @@ subroutine micro_mg_tend ( &
            reff_grau(i,k)=0._r8
         end if 
 
-  ! analytic radar reflectivity
-  !--------------------------------------------------
-  ! formulas from Matthew Shupe, NOAA/CERES
-  ! *****note: radar reflectivity is local (in-precip average)
-  ! units of mm^6/m^3
+        ! analytic radar reflectivity
+        !--------------------------------------------------
+        ! formulas from Matthew Shupe, NOAA/CERES
+        ! *****note: radar reflectivity is local (in-precip average)
+        ! units of mm^6/m^3
 
         if (qc(i,k).ge.qsmall .and. (nc(i,k)+nctend(i,k)*deltat).gt.10._r8) then
            dum=(qc(i,k)/lcldm(i,k)*rho(i,k)*1000._r8)**2 &
@@ -3429,15 +3405,15 @@ subroutine micro_mg_tend ( &
            fcsrfl(i,k)=0._r8
         end if
 
-  !redefine fice here....
+        !redefine fice here....
 
-       dum_2D(i,k) = qsout(i,k) + qrout(i,k) + qc(i,k) + qi(i,k)
-       dumi(i,k) = qsout(i,k) + qi(i,k)
-       if (dumi(i,k) .gt. qsmall .and. dum_2D(i,k) .gt. qsmall) then
-          nfice(i,k)=min(dumi(i,k)/dum_2D(i,k),1._r8)
-       else
-          nfice(i,k)=0._r8
-       end if
+        dum_2D(i,k) = qsout(i,k) + qrout(i,k) + qc(i,k) + qi(i,k)
+        dumi(i,k) = qsout(i,k) + qi(i,k)
+        if (dumi(i,k) .gt. qsmall .and. dum_2D(i,k) .gt. qsmall) then
+           nfice(i,k)=min(dumi(i,k)/dum_2D(i,k),1._r8)
+        else
+           nfice(i,k)=0._r8
+        end if
      end do
   end do
   !$acc end parallel

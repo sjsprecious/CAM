@@ -851,10 +851,13 @@ subroutine size_dist_param_basic_vect2(props, qic, nic, shapeC,lbnd,ubnd, lam, v
   !$acc end data
 end subroutine size_dist_param_basic_vect2
 
-real(r8) elemental function avg_diameter(q, n, rho_air, rho_sub)
+real(r8) function avg_diameter(q, n, rho_air, rho_sub)
   ! Finds the average diameter of particles given their density, and
   ! mass/number concentrations in the air.
   ! Assumes that diameter follows an exponential distribution.
+
+!$acc routine seq
+
   real(r8), intent(in) :: q         ! mass mixing ratio
   real(r8), intent(in) :: n         ! number concentration (per volume)
   real(r8), intent(in) :: rho_air   ! local density of the air
