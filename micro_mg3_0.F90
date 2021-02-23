@@ -473,8 +473,7 @@ subroutine micro_mg_tend ( &
        size_dist_param_liq, &
        size_dist_param_basic, &
        avg_diameter, &
-       size_dist_param_liq_vect, &
-       size_dist_param_basic_vect
+       size_dist_param_liq_vect
 
   ! Microphysical processes.
   use micro_mg_utils, only: &
@@ -1592,22 +1591,11 @@ subroutine micro_mg_tend ( &
         ! make sure number concentration is a positive number to avoid
         ! taking root of negative later
         nric(i,k)=max(nric(i,k),0._r8)
-     end do
-  end do
-  !$acc end parallel
 
-  !!call t_startf ('micro_mg3_size_dist_param_basic_vect')
+        ! Get size distribution parameters for cloud ice
+        call size_dist_param_basic(mg_ice_props, qiic(i,k), niic(i,k), lami(i,k), n0=n0i(i,k))
 
-  ! Get size distribution parameters for cloud ice
-  call size_dist_param_basic_vect(mg_ice_props, qiic, niic, lami, mgncol*nlev, n0=n0i)
-
-  !!call t_stopf ('micro_mg3_size_dist_param_basic_vect')
-
-  ! Alternative autoconversion 
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-     do i=1,mgncol
+        ! Alternative autoconversion 
         if (do_sb_physics) then
            call sb2001v2_liq_autoconversion(pgam(i,k), qcic(i,k), ncic(i,k), qric(i,k), rho(i,k), &
                                             relvar(i,k), prc(i,k), nprc(i,k), nprc1(i,k), 1) 
@@ -1662,21 +1650,14 @@ subroutine micro_mg_tend ( &
         ! make sure number concentration is a positive number to avoid
         ! taking root of negative later
         ngic(i,k)=max(ngic(i,k),0._r8)    
-     end do
-  end do
-  !$acc end parallel
 
-  !.......................................................................
-  ! get size distribution parameters for precip
-  !......................................................................
-  ! rain
+        !.......................................................................
+        ! get size distribution parameters for precip
+        !......................................................................
+        ! rain
 
-  call size_dist_param_basic_vect(mg_rain_props, qric, nric, lamr, mgncol*nlev, n0=n0r)
+        call size_dist_param_basic(mg_rain_props, qric(i,k), nric(i,k), lamr(i,k), n0=n0r(i,k))
 
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-     do i=1,mgncol
         if (lamr(i,k) >= qsmall) then
            dum_2D(i,k)= lamr(i,k)**br
            ! provisional rain number and mass weighted mean fallspeed (m/s)
@@ -1686,19 +1667,12 @@ subroutine micro_mg_tend ( &
            umr(i,k) = 0._r8
            unr(i,k) = 0._r8
         end if
-     end do
-  end do
-  !$acc end parallel
 
-  !......................................................................
-  ! snow
+        !......................................................................
+        ! snow
+      
+        call size_dist_param_basic(mg_snow_props, qsic(i,k), nsic(i,k), lams(i,k), n0=n0s(i,k))
 
-  call size_dist_param_basic_vect(mg_snow_props, qsic, nsic, lams, mgncol*nlev, n0=n0s)
-
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-     do i=1,mgncol
         if (lams(i,k) > 0._r8) then
            dum_2D(i,k) = lams(i,k)**bs
            ! provisional snow number and mass weighted mean fallspeed (m/s)
@@ -1708,23 +1682,15 @@ subroutine micro_mg_tend ( &
            ums(i,k) = 0._r8
            uns(i,k) = 0._r8
         end if
-     end do
-  end do
-  !$acc end parallel
 
-  !  graupel/hail size distributions and properties
-
-  if (do_hail) then
-     call size_dist_param_basic_vect(mg_hail_props, qgic, ngic, lamg, mgncol*nlev, n0=n0g)
-  end if
-  if (do_graupel) then
-     call size_dist_param_basic_vect(mg_graupel_props, qgic, ngic, lamg, mgncol*nlev, n0=n0g)
-  end if
-
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-     do i=1,mgncol
+        !  graupel/hail size distributions and properties
+      
+        if (do_hail) then
+           call size_dist_param_basic(mg_hail_props, qgic(i,k), ngic(i,k), lamg(i,k), n0=n0g(i,k))
+        end if
+        if (do_graupel) then
+           call size_dist_param_basic(mg_graupel_props, qgic(i,k), ngic(i,k), lamg(i,k), n0=n0g(i,k))
+        end if
 
         if (lamg(i,k) > 0._r8) then
            dum_2D(i,k) = lamg(i,k)**bgtmp
@@ -2423,43 +2389,28 @@ subroutine micro_mg_tend ( &
         nsout(i,k) = ns(i,k) * rho(i,k)
         qgout(i,k) = qg(i,k)
         ngout(i,k) = ng(i,k) * rho(i,k)
-     end do
-  end do
-  !$acc end parallel
 
-  !!call t_startf ('micro_mg3_size_dist_param_basic_vect')
+        ! calculate n0r and lamr from rain mass and number
+        ! divide by precip fraction to get in-precip (local) values of
+        ! rain mass and number, divide by rhow to get rain number in kg^-1
+        call size_dist_param_basic(mg_rain_props, qric(i,k), nric(i,k), lamr(i,k), n0=n0r(i,k))
 
-  ! calculate n0r and lamr from rain mass and number
-  ! divide by precip fraction to get in-precip (local) values of
-  ! rain mass and number, divide by rhow to get rain number in kg^-1
-  call size_dist_param_basic_vect(mg_rain_props, qric, nric, lamr, mgncol*nlev, n0=n0r)
+        ! Calculate rercld
+        ! calculate mean size of combined rain and cloud water
+        call calc_rercld(lamr(i,k), n0r(i,k), lamc(i,k), pgam(i,k), qric(i,k), &
+                         qcic(i,k), ncic(i,k), rercld(i,k), 1)
 
-  !!call t_stopf ('micro_mg3_size_dist_param_basic_vect')
+        ! Assign variables back to start-of-timestep values
+        ! Some state variables are changed before the main microphysics loop
+        ! to make "instantaneous" adjustments. Afterward, we must move those changes
+        ! back into the tendencies.
+        ! These processes:
+        !  - Droplet activation (npccn, impacts nc)
+        !  - Instantaneous snow melting  (minstsm/ninstsm, impacts qr/qs/nr/ns)
+        !  - Instantaneous rain freezing (minstfr/ninstrf, impacts qr/qs/nr/ns)
+        !================================================================================
 
-  !!call t_startf ('micro_mg3_calc_rercld')
-
-  ! Calculate rercld
-  ! calculate mean size of combined rain and cloud water
-  call calc_rercld(lamr, n0r, lamc, pgam, qric, qcic, ncic, rercld, mgncol*nlev)
-
-  !!call t_stopf ('micro_mg3_calc_rercld')
-
-  ! Assign variables back to start-of-timestep values
-  ! Some state variables are changed before the main microphysics loop
-  ! to make "instantaneous" adjustments. Afterward, we must move those changes
-  ! back into the tendencies.
-  ! These processes:
-  !  - Droplet activation (npccn, impacts nc)
-  !  - Instantaneous snow melting  (minstsm/ninstsm, impacts qr/qs/nr/ns)
-  !  - Instantaneous rain freezing (minstfr/ninstrf, impacts qr/qs/nr/ns)
-  !================================================================================
-
-  ! Re-apply droplet activation tendency
-
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-     do i=1,mgncol
+        ! Re-apply droplet activation tendency
 
         nc(i,k) = ncn(i,k)
         nctend(i,k) = nctend(i,k) + npccn(i,k)
@@ -2532,13 +2483,13 @@ subroutine micro_mg_tend ( &
         if (nicons) then
            dumni(i,k)=ninst/rho(i,k)
         end if
+
+        ! obtain new slope parameter to avoid possible singularity
+        call size_dist_param_basic(mg_ice_props, dumi(i,k), dumni(i,k), lami(i,k))
+
      end do
   end do
   !$acc end parallel
-
-  ! obtain new slope parameter to avoid possible singularity
-
-  call size_dist_param_basic_vect(mg_ice_props, dumi, dumni, lami, mgncol*nlev)
 
   call size_dist_param_liq_vect(mg_liq_props, dumc, dumnc, rho, pgam, lamc, mgncol*nlev)
 
@@ -2599,26 +2550,18 @@ subroutine micro_mg_tend ( &
            fni(i,k)= 0._r8
         end if
 
-     end do
-  end do
-  !$acc end parallel
+        ! fallspeed for rain
+        call size_dist_param_basic(mg_rain_props, dumr(i,k), dumnr(i,k), lamr(i,k)) 
+        ! fallspeed for snow
+        call size_dist_param_basic(mg_snow_props, dums(i,k), dumns(i,k), lams(i,k))
+        ! fallspeed for graupel
+        if (do_hail) then
+           call size_dist_param_basic(mg_hail_props, dumg(i,k), dumng(i,k), lamg(i,k))
+        end if
+        if (do_graupel) then
+           call size_dist_param_basic(mg_graupel_props, dumg(i,k), dumng(i,k), lamg(i,k))
+        end if
 
-  ! fallspeed for rain
-  call size_dist_param_basic_vect(mg_rain_props, dumr, dumnr, lamr, mgncol*nlev)
-  ! fallspeed for snow
-  call size_dist_param_basic_vect(mg_snow_props, dums, dumns, lams, mgncol*nlev)
-  ! fallspeed for graupel
-  if (do_hail) then
-     call size_dist_param_basic_vect(mg_hail_props, dumg, dumng, lamg, mgncol*nlev)
-  end if
-  if (do_graupel) then
-     call size_dist_param_basic_vect(mg_graupel_props, dumg, dumng, lamg, mgncol*nlev)
-  end if
-
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-     do i=1,mgncol
         if (lamr(i,k).ge.qsmall) then
            qtmp = lamr(i,k)**br
            ! 'final' values of number and mass weighted mean fallspeed for rain (m/s)
@@ -2817,19 +2760,11 @@ subroutine micro_mg_tend ( &
               meltsdttot(i,k)=meltsdttot(i,k) + dum1
            end if
         end if
-     end do
-  end do
-  !$acc end parallel
 
-  ! get mean size of rain = 1/lamr, add frozen rain to either snow or cloud ice
-  ! depending on mean rain size
-  ! add to graupel if using that option....
-  call size_dist_param_basic_vect(mg_rain_props, dumr, dumnr, lamr, mgncol*nlev)
-
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector collapse(2) private(dum,dum1)
-  do k=1,nlev
-     do i=1,mgncol
+        ! get mean size of rain = 1/lamr, add frozen rain to either snow or cloud ice
+        ! depending on mean rain size
+        ! add to graupel if using that option....
+        call size_dist_param_basic(mg_rain_props, dumr(i,k), dumnr(i,k), lamr(i,k))
 
        ! freezing of rain at -5 C
 
@@ -3021,40 +2956,16 @@ subroutine micro_mg_tend ( &
        dumr(i,k)=min(dumr(i,k),10.e-3_r8)
        dums(i,k)=min(dums(i,k),10.e-3_r8)
        dumg(i,k)=min(dumg(i,k),10.e-3_r8)
-     end do
-  end do
-  !$acc end parallel
 
-  ! cloud ice effective radius
-  !-----------------------------------------------------------------
+       ! cloud ice effective radius
+       !-----------------------------------------------------------------
+     
+       if (do_cldice) then
 
-  if (do_cldice) then
-
-     !!call t_startf ('micro_mg3_misc')
-
-     !$acc parallel vector_length(VLEN) default(present)
-     !$acc loop gang vector collapse(2)
-     do k=1,nlev
-        do i=1,mgncol
            dum_2D(i,k) = dumni(i,k)
-        end do
-     end do
-     !$acc end parallel
 
-     !!call t_stopf ('micro_mg3_misc')
+           call size_dist_param_basic(mg_ice_props, dumi(i,k), dumni(i,k), lami(i,k), n0=dumni0A2D(i,k))
 
-     !!call t_startf ('micro_mg3_size_dist_param_basic_vect')
-
-     call size_dist_param_basic_vect(mg_ice_props, dumi, dumni, lami, mgncol*nlev, n0=dumni0A2D)
-
-     !!call t_stopf ('micro_mg3_size_dist_param_basic_vect')
-
-     !!call t_startf ('micro_mg3_misc')
-
-     !$acc parallel vector_length(VLEN) default(present)
-     !$acc loop gang vector collapse(2)
-     do k=1,nlev
-        do i=1,mgncol
            if (dumi(i,k).ge.qsmall) then
               if (dumni(i,k) /= dum_2D(i,k)) then
                  ! adjust number conc if needed to keep mean size in reasonable range
@@ -3069,52 +2980,25 @@ subroutine micro_mg_tend ( &
 
            ! ice effective diameter for david mitchell's optics
            deffi(i,k)=effi(i,k)*rhoi/rhows*2._r8
-        end do
-     end do
-     !$acc end parallel
 
-     !!call t_stopf ('micro_mg3_misc')
-  else
-     !!call t_startf ('micro_mg3_misc')
+       else
 
-     !$acc parallel vector_length(VLEN) default(present)
-     !acc loop gang vector collapse(2)
-     do k=1,nlev
-        do i=1,mgncol
            ! NOTE: If CARMA is doing the ice microphysics, then the ice effective
            ! radius has already been determined from the size distribution.
            effi(i,k) = re_ice(i,k) * 1.e6_r8      ! m -> um
            deffi(i,k)=effi(i,k) * 2._r8
            sadice(i,k) = 4._r8*pi*(effi(i,k)**2)*ni(i,k)*rho(i,k)*1e-2_r8
-        end do
-     end do
-     !$acc end parallel
+       end if
 
-     !!call t_stopf ('micro_mg3_misc')
-  end if
+       ! cloud droplet effective radius
+       !-----------------------------------------------------------------
+       dum_2D(i,k) = dumnc(i,k)
 
-  !!call t_startf ('micro_mg3_misc')
-
-  ! cloud droplet effective radius
-  !-----------------------------------------------------------------
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-     do i=1,mgncol
-        dum_2D(i,k) = dumnc(i,k)
      end do
   end do
   !$acc end parallel
 
-  !!call t_stopf ('micro_mg3_misc')
-
-  !!call t_startf ('micro_mg3_size_dist_param_liq_vect')
-
   call size_dist_param_liq_vect(mg_liq_props, dumc, dumnc, rho, pgam, lamc, mgncol*nlev)
-
-  !!call t_stopf ('micro_mg3_size_dist_param_liq_vect')
-
-  !!call t_startf ('micro_mg3_misc')
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2)
@@ -3176,16 +3060,9 @@ subroutine micro_mg_tend ( &
         ! recalculate 'final' rain size distribution parameters
         ! to ensure that rain size is in bounds, adjust rain number if needed
         dum_2D(i,k) = dumnr(i,k)
-     end do
-  end do
-  !$acc end parallel
 
-  call size_dist_param_basic_vect(mg_rain_props, dumr, dumnr, lamr, mgncol*nlev)
+        call size_dist_param_basic(mg_rain_props, dumr(i,k), dumnr(i,k), lamr(i,k))
 
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-     do i=1,mgncol
         if (dumr(i,k).ge.qsmall) then
            if (dum_2D(i,k) /= dumnr(i,k)) then
               ! adjust number conc if needed to keep mean size in reasonable range
@@ -3196,16 +3073,9 @@ subroutine micro_mg_tend ( &
         ! recalculate 'final' snow size distribution parameters
         ! to ensure that snow size is in bounds, adjust snow number if needed
         dum_2D(i,k) = dumns(i,k)
-     end do
-  end do
-  !$acc end parallel
 
-  call size_dist_param_basic_vect(mg_snow_props, dums, dumns, lams, mgncol*nlev, n0=dumns0A2D)
+        call size_dist_param_basic(mg_snow_props, dums(i,k), dumns(i,k), lams(i,k), n0=dumns0A2D(i,k))
 
-  !$acc parallel vector_length(VLEN) default(present) 
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-     do i=1,mgncol
         if (dums(i,k).ge.qsmall) then
            if (dum_2D(i,k) /= dumns(i,k)) then
               ! adjust number conc if needed to keep mean size in reasonable range
@@ -3217,21 +3087,14 @@ subroutine micro_mg_tend ( &
         ! recalculate 'final' graupel size distribution parameters
         ! to ensure that  size is in bounds, addjust number if needed
         dum_2D(i,k) = dumng(i,k)
-     end do
-  end do
-  !$acc end parallel
 
-  if (do_hail) then
-     call size_dist_param_basic_vect(mg_hail_props, dumg, dumng, lamg, mgncol*nlev)
-  end if
-  if (do_graupel) then
-     call size_dist_param_basic_vect(mg_graupel_props, dumg, dumng, lamg, mgncol*nlev)
-  end if
-
-  !$acc parallel vector_length(VLEN) default(present) 
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-     do i=1,mgncol
+        if (do_hail) then
+           call size_dist_param_basic(mg_hail_props, dumg(i,k), dumng(i,k), lamg(i,k))
+        end if
+        if (do_graupel) then
+           call size_dist_param_basic(mg_graupel_props, dumg(i,k), dumng(i,k), lamg(i,k))
+        end if
+      
         if (dumg(i,k).ge.qsmall) then
            if (dum_2D(i,k) /= dumng(i,k)) then
               ! adjust number conc if needed to keep mean size in reasonable range
@@ -3427,6 +3290,9 @@ end subroutine micro_mg_tend
 !========================================================================
 
 subroutine calc_rercld(lamr, n0r, lamc, pgam, qric, qcic, ncic, rercld, vlen)
+
+!$acc routine seq
+
   integer, intent(in) :: vlen 
   real(r8), dimension(vlen), intent(in) :: lamr          ! rain size parameter (slope)
   real(r8), dimension(vlen), intent(in) :: n0r           ! rain size parameter (intercept)
@@ -3446,17 +3312,11 @@ subroutine calc_rercld(lamr, n0r, lamc, pgam, qric, qcic, ncic, rercld, vlen)
   !$acc data present (rercld,lamr,n0r,lamc,pgam,qric,qcic,ncic) &
   !$acc      create  (Atmp,tmp,pgamp1)
 
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector
   do i=1,vlen
      pgamp1(i) = pgam(i)+1._r8
+     call rising_factorial(pgamp1(i), 2, tmp(i))
   end do
-  !$acc end parallel
 
-  call rising_factorial(pgamp1, 2, tmp, vlen)
-
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector
   do i=1,vlen
      ! Rain drops
      if (lamr(i) > 0._r8) then
@@ -3475,7 +3335,6 @@ subroutine calc_rercld(lamr, n0r, lamc, pgam, qric, qcic, ncic, rercld, vlen)
         rercld(i) = rercld(i) + 3._r8 *(qric(i) + qcic(i)) / (4._r8 * rhow * Atmp(i))
      end if
   end do
-  !$acc end parallel
 
   !$acc end data
 end subroutine calc_rercld
