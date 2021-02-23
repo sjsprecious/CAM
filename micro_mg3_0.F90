@@ -1928,15 +1928,10 @@ subroutine micro_mg_tend ( &
   !$acc end parallel
 
   if (do_cldice) then
-     !!call t_startf ('micro_mg3_ice_deposition_sublimation')
 
      call ice_deposition_sublimation(t, q, qi, ni, &
           icldm, rho, dv, qvl, qvi, &
           berg, vap_dep, ice_sublim, mgncol*nlev)
-
-     !!call t_stopf ('micro_mg3_ice_deposition_sublimation')
-
-     !!call t_startf ('micro_mg3_misc')
 
      !$acc parallel vector_length(VLEN) default(present)
      !$acc loop gang vector collapse(2)
@@ -1959,34 +1954,57 @@ subroutine micro_mg_tend ( &
      end do
      !$acc end parallel
 
-     !!call t_stopf ('micro_mg3_misc')
   end if !do_cldice
 
 ! Process rate calls for graupel   
 !===================================================================
 
+
+  !$acc parallel vector_length(VLEN) default(present)
+  !$acc loop gang vector collapse(2)
+  do k=1,nlev
+     do i=1,mgncol
+
+        if (do_hail.or.do_graupel) then
+           call graupel_collecting_snow(qsic(i,k), qric(i,k), umr(i,k), ums(i,k), &
+                                        rho(i,k), lamr(i,k), n0r(i,k), lams(i,k), &
+                                        n0s(i,k), psacr(i,k), 1)
+
+!           call graupel_collecting_cld_water(qgic(i,k), qcic(i,k), ncic(i,k), rho(i,k), &
+!                                             n0g(i,k), lamg(i,k), bgtmp, agn(i,k), &
+!                                             psacwg(i,k), npsacwg(i,k), 1)
+
+           call graupel_riming_liquid_snow(psacws(i,k), qsic(i,k), qcic(i,k), nsic(i,k), &
+                                           rho(i,k), rhosn, rhogtmp, asn(i,k), lams(i,k), &
+                                           n0s(i,k), deltat, pgsacw(i,k), nscng(i,k), 1)
+           
+           call graupel_collecting_rain(qric(i,k), qgic(i,k), umg(i,k), umr(i,k), ung(i,k), &
+                                        unr(i,k), rho(i,k), n0r(i,k), lamr(i,k), n0g(i,k), &
+                                        lamg(i,k), pracg(i,k), npracg(i,k), 1)
+
+           !AG note: Graupel rain riming snow changes  
+           !    pracs, npracs, (accretion of rain by snow)  psacr (collection of snow by rain)
+           call graupel_rain_riming_snow(pracs(i,k), npracs(i,k), psacr(i,k), qsic(i,k), &
+                                         qric(i,k), nric(i,k), nsic(i,k), n0s(i,k), &
+                                         lams(i,k), n0r(i,k), lamr(i,k), deltat, &
+                                         pgracs(i,k), ngracs(i,k), 1)
+
+!           call graupel_rime_splintering(t(i,k), qcic(i,k), qric(i,k), qgic(i,k), psacwg(i,k), &
+!                                         pracg(i,k), qmultg(i,k), nmultg(i,k), qmultrg(i,k), &
+!                                         nmultrg(i,k), 1)
+
+        end if
+
+     end do
+  end do
+  !$acc end parallel
+
   if (do_hail.or.do_graupel) then
-
-     !!call t_startf ('micro_mg3_evap_graupel')
-
-     call graupel_collecting_snow(qsic, qric, umr, ums, rho, lamr, n0r, lams, n0s, psacr, mgncol*nlev)
-
-     call graupel_collecting_cld_water(qgic, qcic, ncic, rho, n0g, lamg, bgtmp, agn, psacwg, npsacwg, mgncol*nlev)
-     
-     call graupel_riming_liquid_snow(psacws, qsic, qcic, nsic, rho, rhosn, rhogtmp, asn, &
-                                     lams, n0s, deltat, pgsacw, nscng, mgncol*nlev)
-
-     call graupel_collecting_rain(qric, qgic, umg, umr, ung, unr, rho, n0r, &
-                                  lamr, n0g, lamg, pracg, npracg, mgncol*nlev)
-        
-!AG note: Graupel rain riming snow changes  
-!    pracs, npracs, (accretion of rain by snow)  psacr (collection of snow by rain)
-
-     call graupel_rain_riming_snow(pracs, npracs, psacr, qsic, qric, nric, nsic, &
-                                   n0s, lams, n0r, lamr, deltat, pgracs, ngracs, mgncol*nlev)
-   
+    
+     call graupel_collecting_cld_water(qgic, qcic, ncic, rho, n0g, lamg, &
+                                       bgtmp, agn, psacwg, npsacwg, mgncol*nlev)
+ 
      call graupel_rime_splintering(t, qcic, qric, qgic, psacwg, pracg, qmultg, nmultg, qmultrg, nmultrg,mgncol*nlev)
-
 
      call evaporate_sublimate_precip_graupel(t, rho, dv, mu, sc, q, qvl, qvi, lcldm, precip_frac, arn, asn, agn, &
                                              bgtmp, qcic, qiic, qric, qsic, qgic, lamr, n0r, lams, n0s, lamg, n0g, &
@@ -2006,10 +2024,8 @@ subroutine micro_mg_tend ( &
 
   end if ! end do_graupel/hail loop
 
-  call nvtxStartRange("mg3_bigkernel", 1) 
-
   !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector collapse(2) private(dum,ratio)
+  !$acc loop gang vector collapse(2) private(dum,dum1,ratio,tmpfrz)
   do k=1,nlev
      do i=1,mgncol
         ! conservation to ensure no negative values of cloud water/precipitation
@@ -2049,12 +2065,7 @@ subroutine micro_mg_tend ( &
         if (qc(i,k) >= qsmall) then
            vap_dep(i,k) = vap_dep(i,k)*(1._r8-qcrat(i,k))
         end if
-     end do
-  end do
-
-  !$acc loop gang vector collapse(2) private(dum,dum1)
-  do k=1,nlev
-     do i=1,mgncol
+  
         !=================================================================
         ! apply limiter to ensure that ice/snow sublimation and rain evap
         ! don't push conditions into supersaturation, and ice deposition/nucleation don't
@@ -2078,12 +2089,7 @@ subroutine micro_mg_tend ( &
               vap_dep(i,k) = dum - mnuccd(i,k)
            end if
         end if
-     end do
-  end do 
 
-  !$acc loop gang vector collapse(2) private(dum,ratio)
-  do k=1,nlev
-     do i=1,mgncol
         !===================================================================
         ! conservation of nc
         !-------------------------------------------------------------------
@@ -2111,12 +2117,7 @@ subroutine micro_mg_tend ( &
               nnuccr(i,k)=0._r8
            end if
         end if
-     end do
-  end do
 
-  !$acc loop gang vector collapse(2) private(dum,ratio)
-  do k=1,nlev
-     do i=1,mgncol
         ! conservation of rain mixing ratio
         !-------------------------------------------------------------------
         dum = ((-pre(i,k)+pracs(i,k)+mnuccr(i,k)+mnuccri(i,k) &
@@ -2136,12 +2137,7 @@ subroutine micro_mg_tend ( &
            mnuccr(i,k)=mnuccr(i,k)*ratio
            mnuccri(i,k)=mnuccri(i,k)*ratio
         end if
-     end do
-  end do
-
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-     do i=1,mgncol
+  
         ! conservation of rain number
         !-------------------------------------------------------------------
         ! Add evaporation of rain number.
@@ -2150,12 +2146,7 @@ subroutine micro_mg_tend ( &
         else
            nsubr(i,k) = 0._r8
         end if
-     end do
-  end do
-
-  !$acc loop gang vector collapse(2) private(dum,ratio)
-  do k=1,nlev
-     do i=1,mgncol
+  
         dum = ((-nsubr(i,k)+npracs(i,k)+nnuccr(i,k)+nnuccri(i,k)-nragg(i,k)+npracg(i,k)+ngracs(i,k)) &
              *precip_frac(i,k)- nprc(i,k)*lcldm(i,k))*deltat
         if (dum.gt.nr(i,k)) then
@@ -2169,13 +2160,8 @@ subroutine micro_mg_tend ( &
            nsubr(i,k)=nsubr(i,k)*ratio
            nnuccri(i,k)=nnuccri(i,k)*ratio
         end if
-     end do
-  end do
 
-  if (do_cldice) then
-     !$acc loop gang vector collapse(2) private(dum,ratio)
-     do k=1,nlev
-        do i=1,mgncol
+        if (do_cldice) then
            ! conservation of qi
            !-------------------------------------------------------------------
            dum = ((-mnuccc(i,k)-mnucct(i,k)-mnudep(i,k)-msacwi(i,k)-qmultg(i,k))*lcldm(i,k)+(prci(i,k)+ &
@@ -2190,14 +2176,7 @@ subroutine micro_mg_tend ( &
               prai(i,k) = prai(i,k)*ratio
               ice_sublim(i,k) = ice_sublim(i,k)*ratio
            end if
-        end do
-     end do
-  end if
-
-  if (do_cldice) then
-     !$acc loop gang vector collapse(2) private(dum,ratio,tmpfrz)
-     do k=1,nlev
-        do i=1,mgncol
+        
            ! conservation of ni
            !-------------------------------------------------------------------
            if (use_hetfrz_classnuc) then
@@ -2217,13 +2196,8 @@ subroutine micro_mg_tend ( &
               nprai(i,k) = nprai(i,k)*ratio
               nsubi(i,k) = nsubi(i,k)*ratio
            end if
-        end do
-     end do
-  end if
+        end if
 
-  !$acc loop gang vector collapse(2) private(dum,ratio)
-  do k=1,nlev
-     do i=1,mgncol
         ! conservation of snow mixing ratio
         !-------------------------------------------------------------------
         if (do_hail .or. do_graupel) then
@@ -2250,12 +2224,7 @@ subroutine micro_mg_tend ( &
            end if
            prds(i,k)=prds(i,k)*ratio
         end if
-     end do
-  end do
 
-  !$acc loop gang vector collapse(2) private(dum,ratio)
-  do k=1,nlev
-     do i=1,mgncol
         ! conservation of snow number
         !-------------------------------------------------------------------
         ! calculate loss of number due to sublimation
@@ -2280,18 +2249,13 @@ subroutine micro_mg_tend ( &
            nsubs(i,k)=nsubs(i,k)*ratio
            nsagg(i,k)=nsagg(i,k)*ratio
         end if
-     end do
-  end do
 
 ! Graupel Conservation Checks
 !-------------------------------------------------------------------
 
-  if (do_hail.or.do_graupel) then
-     ! conservation of graupel mass
-     !-------------------------------------------------------------------
-     !$acc loop gang vector collapse(2) private(dum,ratio)
-     do k=1,nlev
-        do i=1,mgncol
+        if (do_hail.or.do_graupel) then
+           ! conservation of graupel mass
+           !-------------------------------------------------------------------
            dum= ((-pracg(i,k)-pgracs(i,k)-prdg(i,k)-psacr(i,k)-mnuccr(i,k))*precip_frac(i,k) &
                 + (-psacwg(i,k)-pgsacw(i,k))*lcldm(i,k))*deltat
            if (dum.gt.qg(i,k)) then
@@ -2300,16 +2264,11 @@ subroutine micro_mg_tend ( &
                    + (psacwg(i,k)+pgsacw(i,k))*lcldm(i,k)) / ((-prdg(i,k))*precip_frac(i,k))  *omsm
               prdg(i,k)= prdg(i,k)*ratio
            end if
-        end do
-     end do
+     
+           ! conservation of graupel number: not needed, no sinks
+           !-------------------------------------------------------------------
+        end if
 
-     ! conservation of graupel number: not needed, no sinks
-     !-------------------------------------------------------------------
-  end if
-
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-     do i=1,mgncol
         ! next limit ice and snow sublimation and rain evaporation
         ! get estimate of q and t at end of time step
         ! don't include other microphysical processes since they haven't
@@ -2321,8 +2280,6 @@ subroutine micro_mg_tend ( &
      end do
   end do
   !$acc end parallel
-
-  call nvtxEndRange
 
   !!call t_startf ('micro_mg3_qsat')
 

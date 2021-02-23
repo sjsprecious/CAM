@@ -257,7 +257,7 @@ real(r8) :: gamma_2bs_plus2
 
 integer, parameter :: max_vlen = pcols*pver
 
-!$acc declare create (rv,cpp,tmelt,xxlv,xxls, &
+!$acc declare create (rv,cpp,tmelt,xxlv,xxls,ra, &
 !$acc                 gamma_bs_plus3,gamma_half_br_plus5, &
 !$acc                 gamma_half_bs_plus5,gamma_2bs_plus2)
 
@@ -358,7 +358,7 @@ subroutine micro_mg_utils_init( kind, rair, rh2o, cpair, tmelt_in, latvap, &
   mg_graupel_props = MGHydrometeorProps(rhog, dsph, lam_bnd_snow)
   mg_hail_props = MGHydrometeorProps(rhoh, dsph, lam_bnd_snow)
 
-  !$acc update device (rv,cpp,tmelt,xxlv,xxls,gamma_bs_plus3, &
+  !$acc update device (rv,cpp,tmelt,xxlv,xxls,ra,gamma_bs_plus3, &
   !$acc                gamma_half_br_plus5,gamma_half_bs_plus5,gamma_2bs_plus2)
 
 end subroutine micro_mg_utils_init
@@ -2280,6 +2280,8 @@ end subroutine bergeron_process_snow
 subroutine graupel_collecting_snow(qsic,qric,umr,ums,rho,lamr,n0r,lams,n0s, &
      psacr, vlen)
   
+!$acc routine seq
+
   integer, intent(in) :: vlen
 
   ! In-cloud MMRs
@@ -2310,8 +2312,6 @@ subroutine graupel_collecting_snow(qsic,qric,umr,ums,rho,lamr,n0r,lams,n0s, &
 
   cons31=pi*pi*ecr*rhosn
 
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector
   do i=1,vlen
 
      if (qsic(i).ge.0.1e-3_r8 .and. qric(i).ge.0.1e-3_r8) then
@@ -2326,7 +2326,6 @@ subroutine graupel_collecting_snow(qsic,qric,umr,ums,rho,lamr,n0r,lams,n0s, &
      end if
 
   end do
-  !$acc end parallel
 
   !$acc end data
 end subroutine graupel_collecting_snow
@@ -2397,6 +2396,8 @@ end subroutine graupel_collecting_cld_water
 subroutine graupel_riming_liquid_snow(psacws,qsic,qcic,nsic,rho,rhosn,rhog,asn,lams,n0s,dtime, &
      pgsacw,nscng,vlen)
 
+!$acc routine seq
+
   integer, intent(in) :: vlen
 
   ! Accretion of cloud water to snow tendency (modified)
@@ -2437,8 +2438,6 @@ subroutine graupel_riming_liquid_snow(psacws,qsic,qcic,nsic,rho,rhosn,rhog,asn,l
 
   cons  = 4._r8 *2._r8 *3._r8*rhosu*pi*ecid*ecid*gamma_2bs_plus2/(8._r8*(rhog-rhosn))
 
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector private(dum)
   do i=1,vlen
       
 ! Only allow conversion if qni > 0.1 and qc > 0.5 g/kg following Rutledge and Hobbs (1984)
@@ -2466,7 +2465,6 @@ subroutine graupel_riming_liquid_snow(psacws,qsic,qcic,nsic,rho,rhosn,rhog,asn,l
      end if
      
   end do
-  !$acc end parallel
 
   !$acc end data
 end subroutine graupel_riming_liquid_snow
@@ -2477,6 +2475,8 @@ end subroutine graupel_riming_liquid_snow
 
 subroutine graupel_collecting_rain(qric,qgic,umg,umr,ung,unr,rho,n0r,lamr,n0g,lamg,&
      pracg,npracg,vlen)
+
+!$acc routine seq
 
   integer, intent(in) :: vlen
 
@@ -2522,8 +2522,6 @@ subroutine graupel_collecting_rain(qric,qgic,umg,umr,ung,unr,rho,n0r,lamr,n0g,la
   cons41=pi*pi*ecr*rhow
   cons32=pi/2._r8*ecr
 
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector private(dum)
   do i=1,vlen
 
      if (qric(i).ge.1.e-8_r8.and.qgic(i).ge.1.e-8_r8) then
@@ -2556,7 +2554,6 @@ subroutine graupel_collecting_rain(qric,qgic,umg,umr,ung,unr,rho,n0r,lamr,n0g,la
      end if
      
   end do
-  !$acc end parallel
 
   !$acc end data
 end subroutine graupel_collecting_rain
@@ -2568,6 +2565,8 @@ end subroutine graupel_collecting_rain
 
 subroutine graupel_rain_riming_snow(pracs,npracs,psacr,qsic,qric,nric,nsic,n0s,lams,n0r,lamr,dtime,&
      pgracs,ngracs,vlen)
+
+!$acc routine seq
 
   integer, intent(in) :: vlen
   
@@ -2611,8 +2610,6 @@ subroutine graupel_rain_riming_snow(pracs,npracs,psacr,qsic,qric,nric,nsic,n0s,l
   cons18=rhosn*rhosn
   cons19=rhow*rhow
 
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector private(dum)
   do i=1,vlen
      
      fmult=0._r8
@@ -2643,7 +2640,6 @@ subroutine graupel_rain_riming_snow(pracs,npracs,psacr,qsic,qric,nric,nsic,n0s,l
         ngracs(i) = 0._r8
      end if
   end do 
-  !$acc end parallel
 
   !$acc end data
 end subroutine graupel_rain_riming_snow
@@ -2653,6 +2649,8 @@ end subroutine graupel_rain_riming_snow
 !========================================================================
 subroutine graupel_rime_splintering(t,qcic,qric,qgic,psacwg,pracg,&
      qmultg,nmultg,qmultrg,nmultrg,vlen)
+
+!!!$acc routine seq
 
   integer, intent(in) :: vlen
   
@@ -2692,7 +2690,7 @@ subroutine graupel_rime_splintering(t,qcic,qric,qgic,psacwg,pracg,&
 !========================================================================
 
   !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector private(fmult)
+  !$acc loop gang vector
   do i=1,vlen
 
      nmultrg(i)=0._r8
@@ -2753,7 +2751,7 @@ subroutine graupel_rime_splintering(t,qcic,qric,qgic,psacwg,pracg,&
      end if
   end do
   !$acc end parallel
-
+ 
   !$acc end data
 end subroutine graupel_rime_splintering
 
