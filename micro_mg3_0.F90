@@ -472,8 +472,7 @@ subroutine micro_mg_tend ( &
   use micro_mg_utils, only: &
        size_dist_param_liq, &
        size_dist_param_basic, &
-       avg_diameter, &
-       size_dist_param_liq_vect
+       avg_diameter
 
   ! Microphysical processes.
   use micro_mg_utils, only: &
@@ -2482,16 +2481,8 @@ subroutine micro_mg_tend ( &
         ! obtain new slope parameter to avoid possible singularity
         call size_dist_param_basic(mg_ice_props, dumi(i,k), dumni(i,k), lami(i,k))
 
-     end do
-  end do
-  !$acc end parallel
-
-  call size_dist_param_liq_vect(mg_liq_props, dumc, dumnc, rho, pgam, lamc, mgncol*nlev)
-
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector collapse(2) private(dum1,dum2,dum3,dum4,irad,ifrac)
-  do k=1,nlev
-     do i=1,mgncol
+        call size_dist_param_liq(mg_liq_props, dumc(i,k), dumnc(i,k), &
+                                 rho(i,k), pgam(i,k), lamc(i,k))
 
         ! calculate number and mass weighted fall velocity for droplets and cloud ice
         !-------------------------------------------------------------------
@@ -2586,11 +2577,9 @@ subroutine micro_mg_tend ( &
         if (lamg(i,k).ge.qsmall) then
            ! 'final' values of number and mass weighted mean fallspeed for graupel (m/s)
            umg(i,k) = min(agn(i,k)*gamma_bg_plus4/(6._r8*lamg(i,k)**bgtmp),20._r8*rhof(i,k))
-!           umg(i,k) = min(agn(i,k)*gamma(4._r8+bgtmp)/(6._r8*lamg(i,k)**bgtmp),20._r8*rhof(i,k))
            fg(i,k) = g*rho(i,k)*umg(i,k)
 
            ung(i,k) = min(agn(i,k)*gamma_bg_plus1/lamg(i,k)**bgtmp,20._r8*rhof(i,k))
-!           ung(i,k) = min(agn(i,k)*gamma(1._r8+bgtmp)/lamg(i,k)**bgtmp,20._r8*rhof(i,k))
            fng(i,k) = g*rho(i,k)*ung(i,k)
         else
            fg(i,k)=0._r8
@@ -2761,153 +2750,153 @@ subroutine micro_mg_tend ( &
         ! add to graupel if using that option....
         call size_dist_param_basic(mg_rain_props, dumr(i,k), dumnr(i,k), lamr(i,k))
 
-       ! freezing of rain at -5 C
+        ! freezing of rain at -5 C
 
-       if (t(i,k)+tlat(i,k)/cpp*deltat < rainfrze) then
-          if (dumr(i,k) > 0._r8) then
+        if (t(i,k)+tlat(i,k)/cpp*deltat < rainfrze) then
+           if (dumr(i,k) > 0._r8) then
 
-             ! make sure freezing rain doesn't increase temperature above threshold
-             dum = xlf/cpp*dumr(i,k)
-             if (t(i,k)+tlat(i,k)/cpp*deltat+dum.gt.rainfrze) then
-                dum = -(t(i,k)+tlat(i,k)/cpp*deltat-rainfrze)*cpp/xlf
-                dum = dum/dumr(i,k)
-                dum = max(0._r8,dum)
-                dum = min(1._r8,dum)
-             else
-                dum = 1._r8
-             end if
+              ! make sure freezing rain doesn't increase temperature above threshold
+              dum = xlf/cpp*dumr(i,k)
+              if (t(i,k)+tlat(i,k)/cpp*deltat+dum.gt.rainfrze) then
+                 dum = -(t(i,k)+tlat(i,k)/cpp*deltat-rainfrze)*cpp/xlf
+                 dum = dum/dumr(i,k)
+                 dum = max(0._r8,dum)
+                 dum = min(1._r8,dum)
+              else
+                 dum = 1._r8
+              end if
 
-             qrtend(i,k)=qrtend(i,k)-dum*dumr(i,k)*rdeltat
-             nrtend(i,k)=nrtend(i,k)-dum*dumnr(i,k)*rdeltat
+              qrtend(i,k)=qrtend(i,k)-dum*dumr(i,k)*rdeltat
+              nrtend(i,k)=nrtend(i,k)-dum*dumnr(i,k)*rdeltat
 
-             if (lamr(i,k) < 1._r8/Dcs) then
+              if (lamr(i,k) < 1._r8/Dcs) then
 
-                if(do_hail.or.do_graupel) then
-                   qgtend(i,k)=qgtend(i,k)+dum*dumr(i,k)*rdeltat
-                   ngtend(i,k)=ngtend(i,k)+dum*dumnr(i,k)*rdeltat
-                else
-                   qstend(i,k)=qstend(i,k)+dum*dumr(i,k)*rdeltat
-                   nstend(i,k)=nstend(i,k)+dum*dumnr(i,k)*rdeltat
-                end if
-
-             else
-                qitend(i,k)=qitend(i,k)+dum*dumr(i,k)*rdeltat
-                nitend(i,k)=nitend(i,k)+dum*dumnr(i,k)*rdeltat
-             end if
-
-             ! heating tendency
-             dum1 = xlf*dum*dumr(i,k)*rdeltat
-             frzrdttot(i,k)=frzrdttot(i,k) + dum1
-             tlat(i,k)=tlat(i,k)+dum1
-
-          end if
-       end if
-
-       if (do_cldice) then
-
-           if (t(i,k)+tlat(i,k)/cpp*deltat > tmelt) then
-              if (dumi(i,k) > 0._r8) then
-
-                 ! limit so that melting does not push temperature below freezing
-                 !-----------------------------------------------------------------
-                 dum = -dumi(i,k)*xlf/cpp
-                 if (t(i,k)+tlat(i,k)/cpp*deltat+dum.lt.tmelt) then
-                    dum = (t(i,k)+tlat(i,k)/cpp*deltat-tmelt)*cpp/xlf
-                    dum = dum/dumi(i,k)
-                    dum = max(0._r8,dum)
-                    dum = min(1._r8,dum)
+                 if(do_hail.or.do_graupel) then
+                    qgtend(i,k)=qgtend(i,k)+dum*dumr(i,k)*rdeltat
+                    ngtend(i,k)=ngtend(i,k)+dum*dumnr(i,k)*rdeltat
                  else
-                    dum = 1._r8
+                    qstend(i,k)=qstend(i,k)+dum*dumr(i,k)*rdeltat
+                    nstend(i,k)=nstend(i,k)+dum*dumnr(i,k)*rdeltat
                  end if
 
-                 qctend(i,k)=qctend(i,k)+dum*dumi(i,k)*rdeltat
-
-                 ! for output
-                 melttot(i,k)=dum*dumi(i,k)*rdeltat
-
-                 ! assume melting ice produces droplet
-                 ! mean volume radius of 8 micron
-
-                 nctend(i,k)=nctend(i,k)+3._r8*dum*dumi(i,k)*rdeltat/ &
-                      (4._r8*pi*5.12e-16_r8*rhow)
-
-                 qitend(i,k)=((1._r8-dum)*dumi(i,k)-qi(i,k))*rdeltat
-                 nitend(i,k)=((1._r8-dum)*dumni(i,k)-ni(i,k))*rdeltat
-                 tlat(i,k)=tlat(i,k)-xlf*dum*dumi(i,k)*rdeltat
+              else
+                 qitend(i,k)=qitend(i,k)+dum*dumr(i,k)*rdeltat
+                 nitend(i,k)=nitend(i,k)+dum*dumnr(i,k)*rdeltat
               end if
+
+              ! heating tendency
+              dum1 = xlf*dum*dumr(i,k)*rdeltat
+              frzrdttot(i,k)=frzrdttot(i,k) + dum1
+              tlat(i,k)=tlat(i,k)+dum1
+
            end if
+        end if
+
+        if (do_cldice) then
+
+            if (t(i,k)+tlat(i,k)/cpp*deltat > tmelt) then
+               if (dumi(i,k) > 0._r8) then
+
+                  ! limit so that melting does not push temperature below freezing
+                  !-----------------------------------------------------------------
+                  dum = -dumi(i,k)*xlf/cpp
+                  if (t(i,k)+tlat(i,k)/cpp*deltat+dum.lt.tmelt) then
+                     dum = (t(i,k)+tlat(i,k)/cpp*deltat-tmelt)*cpp/xlf
+                     dum = dum/dumi(i,k)
+                     dum = max(0._r8,dum)
+                     dum = min(1._r8,dum)
+                  else
+                     dum = 1._r8
+                  end if
+
+                  qctend(i,k)=qctend(i,k)+dum*dumi(i,k)*rdeltat
+
+                  ! for output
+                  melttot(i,k)=dum*dumi(i,k)*rdeltat
+
+                  ! assume melting ice produces droplet
+                  ! mean volume radius of 8 micron
+
+                  nctend(i,k)=nctend(i,k)+3._r8*dum*dumi(i,k)*rdeltat/ &
+                       (4._r8*pi*5.12e-16_r8*rhow)
+
+                  qitend(i,k)=((1._r8-dum)*dumi(i,k)-qi(i,k))*rdeltat
+                  nitend(i,k)=((1._r8-dum)*dumni(i,k)-ni(i,k))*rdeltat
+                  tlat(i,k)=tlat(i,k)-xlf*dum*dumi(i,k)*rdeltat
+               end if
+            end if
 
      ! homogeneously freeze droplets at -40 C
      !-----------------------------------------------------------------
 
-           if (t(i,k)+tlat(i,k)/cpp*deltat < 233.15_r8) then
-              if (dumc(i,k) > 0._r8) then
+            if (t(i,k)+tlat(i,k)/cpp*deltat < 233.15_r8) then
+               if (dumc(i,k) > 0._r8) then
 
-                 ! limit so that freezing does not push temperature above threshold
-                 dum = dumc(i,k)*xlf/cpp
-                 if (t(i,k)+tlat(i,k)/cpp*deltat+dum.gt.233.15_r8) then
-                    dum = -(t(i,k)+tlat(i,k)/cpp*deltat-233.15_r8)*cpp/xlf
-                    dum = dum/dumc(i,k)
-                    dum = max(0._r8,dum)
-                    dum = min(1._r8,dum)
-                 else
-                    dum = 1._r8
-                 end if
+                  ! limit so that freezing does not push temperature above threshold
+                  dum = dumc(i,k)*xlf/cpp
+                  if (t(i,k)+tlat(i,k)/cpp*deltat+dum.gt.233.15_r8) then
+                     dum = -(t(i,k)+tlat(i,k)/cpp*deltat-233.15_r8)*cpp/xlf
+                     dum = dum/dumc(i,k)
+                     dum = max(0._r8,dum)
+                     dum = min(1._r8,dum)
+                  else
+                     dum = 1._r8
+                  end if
 
-                 qitend(i,k)=qitend(i,k)+dum*dumc(i,k)*rdeltat
-                 ! for output
-                 homotot(i,k)=dum*dumc(i,k)*rdeltat
+                  qitend(i,k)=qitend(i,k)+dum*dumc(i,k)*rdeltat
+                  ! for output
+                  homotot(i,k)=dum*dumc(i,k)*rdeltat
 
-                 ! assume 25 micron mean volume radius of homogeneously frozen droplets
-                 ! consistent with size of detrained ice in stratiform.F90
-                 nitend(i,k)=nitend(i,k)+dum*3._r8*dumc(i,k)/(4._r8*3.14_r8*1.563e-14_r8*500._r8)*rdeltat
-                 qctend(i,k)=((1._r8-dum)*dumc(i,k)-qc(i,k))*rdeltat
-                 nctend(i,k)=((1._r8-dum)*dumnc(i,k)-nc(i,k))*rdeltat
-                 tlat(i,k)=tlat(i,k)+xlf*dum*dumc(i,k)*rdeltat
-              end if
-           end if
+                  ! assume 25 micron mean volume radius of homogeneously frozen droplets
+                  ! consistent with size of detrained ice in stratiform.F90
+                  nitend(i,k)=nitend(i,k)+dum*3._r8*dumc(i,k)/(4._r8*3.14_r8*1.563e-14_r8*500._r8)*rdeltat
+                  qctend(i,k)=((1._r8-dum)*dumc(i,k)-qc(i,k))*rdeltat
+                  nctend(i,k)=((1._r8-dum)*dumnc(i,k)-nc(i,k))*rdeltat
+                  tlat(i,k)=tlat(i,k)+xlf*dum*dumc(i,k)*rdeltat
+               end if
+            end if
 
      ! remove any excess over-saturation, which is possible due to non-linearity when adding
      ! together all microphysical processes
      !-----------------------------------------------------------------
      ! follow code similar to old CAM scheme
 
-           dum_2D(i,k)=q(i,k)+qvlat(i,k)*deltat
-           ttmpA(i,k)=t(i,k)+tlat(i,k)/cpp*deltat
+            dum_2D(i,k)=q(i,k)+qvlat(i,k)*deltat
+            ttmpA(i,k)=t(i,k)+tlat(i,k)/cpp*deltat
 
-           ! use rhw to allow ice supersaturation
-           call qsat_water(ttmpA(i,k), p(i,k), esnA(i,k), qvnA(i,k), 1)
+            ! use rhw to allow ice supersaturation
+            call qsat_water(ttmpA(i,k), p(i,k), esnA(i,k), qvnA(i,k), 1)
 
-           if (dum_2D(i,k) > qvnA(i,k) .and. qvnA(i,k) > 0 .and. allow_sed_supersat) then
-              ! expression below is approximate since there may be ice deposition
-              dum = (dum_2D(i,k)-qvnA(i,k))/(1._r8+xxlv_squared*qvnA(i,k)/(cpp*rv*ttmpA(i,k)**2))*rdeltat
-              ! add to output cme
-              cmeout(i,k) = cmeout(i,k)+dum
-              ! now add to tendencies, partition between liquid and ice based on temperature
-              if (ttmpA(i,k) > 268.15_r8) then
-                 dum1=0.0_r8
-                 ! now add to tendencies, partition between liquid and ice based on te
-                 !-------------------------------------------------------
-              else if (ttmpA(i,k) < 238.15_r8) then
-                 dum1=1.0_r8
-              else
-                 dum1=(268.15_r8-ttmpA(i,k))/30._r8
-              end if
+            if (dum_2D(i,k) > qvnA(i,k) .and. qvnA(i,k) > 0 .and. allow_sed_supersat) then
+               ! expression below is approximate since there may be ice deposition
+               dum = (dum_2D(i,k)-qvnA(i,k))/(1._r8+xxlv_squared*qvnA(i,k)/(cpp*rv*ttmpA(i,k)**2))*rdeltat
+               ! add to output cme
+               cmeout(i,k) = cmeout(i,k)+dum
+               ! now add to tendencies, partition between liquid and ice based on temperature
+               if (ttmpA(i,k) > 268.15_r8) then
+                  dum1=0.0_r8
+                  ! now add to tendencies, partition between liquid and ice based on te
+                  !-------------------------------------------------------
+               else if (ttmpA(i,k) < 238.15_r8) then
+                  dum1=1.0_r8
+               else
+                  dum1=(268.15_r8-ttmpA(i,k))/30._r8
+               end if
 
-              dum = (dum_2D(i,k)-qvnA(i,k))/(1._r8+(xxls*dum1+xxlv*(1._r8-dum1))**2 &
-                    *qvnA(i,k)/(cpp*rv*ttmpA(i,k)**2))*rdeltat
-              qctend(i,k)=qctend(i,k)+dum*(1._r8-dum1)
-              ! for output
-              qcrestot(i,k)=dum*(1._r8-dum1)
-              qitend(i,k)=qitend(i,k)+dum*dum1
-              qirestot(i,k)=dum*dum1
-              qvlat(i,k)=qvlat(i,k)-dum
-              ! for output
-              qvres(i,k)=-dum
-              tlat(i,k)=tlat(i,k)+dum*(1._r8-dum1)*xxlv+dum*dum1*xxls
-           end if
+               dum = (dum_2D(i,k)-qvnA(i,k))/(1._r8+(xxls*dum1+xxlv*(1._r8-dum1))**2 &
+                     *qvnA(i,k)/(cpp*rv*ttmpA(i,k)**2))*rdeltat
+               qctend(i,k)=qctend(i,k)+dum*(1._r8-dum1)
+               ! for output
+               qcrestot(i,k)=dum*(1._r8-dum1)
+               qitend(i,k)=qitend(i,k)+dum*dum1
+               qirestot(i,k)=dum*dum1
+               qvlat(i,k)=qvlat(i,k)-dum
+               ! for output
+               qvres(i,k)=-dum
+               tlat(i,k)=tlat(i,k)+dum*(1._r8-dum1)*xxlv+dum*dum1*xxls
+            end if
 
-       end if
+        end if
 
   ! calculate effective radius for pass to radiation code
   !=========================================================
@@ -2917,88 +2906,81 @@ subroutine micro_mg_tend ( &
   ! update cloud variables after instantaneous processes to get effective radius
   ! variables are in-cloud to calculate size dist parameters
 
-       dumc(i,k) = max(qc(i,k)+qctend(i,k)*deltat,0._r8)/lcldm(i,k)
-       dumi(i,k) = max(qi(i,k)+qitend(i,k)*deltat,0._r8)/icldm(i,k)
-       dumnc(i,k) = max(nc(i,k)+nctend(i,k)*deltat,0._r8)/lcldm(i,k)
-       dumni(i,k) = max(ni(i,k)+nitend(i,k)*deltat,0._r8)/icldm(i,k)
+        dumc(i,k) = max(qc(i,k)+qctend(i,k)*deltat,0._r8)/lcldm(i,k)
+        dumi(i,k) = max(qi(i,k)+qitend(i,k)*deltat,0._r8)/icldm(i,k)
+        dumnc(i,k) = max(nc(i,k)+nctend(i,k)*deltat,0._r8)/lcldm(i,k)
+        dumni(i,k) = max(ni(i,k)+nitend(i,k)*deltat,0._r8)/icldm(i,k)
 
-       dumr(i,k) = max(qr(i,k)+qrtend(i,k)*deltat,0._r8)/precip_frac(i,k)
-       dumnr(i,k) = max(nr(i,k)+nrtend(i,k)*deltat,0._r8)/precip_frac(i,k)
-       dums(i,k) = max(qs(i,k)+qstend(i,k)*deltat,0._r8)/precip_frac(i,k)
-       dumns(i,k) = max(ns(i,k)+nstend(i,k)*deltat,0._r8)/precip_frac(i,k)
-       dumg(i,k) = max(qg(i,k)+qgtend(i,k)*deltat,0._r8)
-       dumng(i,k) = max(ng(i,k)+ngtend(i,k)*deltat,0._r8)
+        dumr(i,k) = max(qr(i,k)+qrtend(i,k)*deltat,0._r8)/precip_frac(i,k)
+        dumnr(i,k) = max(nr(i,k)+nrtend(i,k)*deltat,0._r8)/precip_frac(i,k)
+        dums(i,k) = max(qs(i,k)+qstend(i,k)*deltat,0._r8)/precip_frac(i,k)
+        dumns(i,k) = max(ns(i,k)+nstend(i,k)*deltat,0._r8)/precip_frac(i,k)
+        dumg(i,k) = max(qg(i,k)+qgtend(i,k)*deltat,0._r8)
+        dumng(i,k) = max(ng(i,k)+ngtend(i,k)*deltat,0._r8)
 
-       ! switch for specification of droplet and crystal number
-       if (nccons) then
-          dumnc(i,k)=ncnst/rho(i,k)
-       end if
+        ! switch for specification of droplet and crystal number
+        if (nccons) then
+           dumnc(i,k)=ncnst/rho(i,k)
+        end if
 
-       ! switch for specification of cloud ice number
-       if (nicons) then
-          dumni(i,k)=ninst/rho(i,k)
-       end if
+        ! switch for specification of cloud ice number
+        if (nicons) then
+           dumni(i,k)=ninst/rho(i,k)
+        end if
 
-       ! switch for specification of graupel number
-       if (ngcons) then
-          dumng(i,k)=ngnst/rho(i,k)*precip_frac(i,k)
-       end if
+        ! switch for specification of graupel number
+        if (ngcons) then
+           dumng(i,k)=ngnst/rho(i,k)*precip_frac(i,k)
+        end if
 
-       ! limit in-cloud mixing ratio to reasonable value of 5 g kg-1
-       dumc(i,k)=min(dumc(i,k),5.e-3_r8)
-       dumi(i,k)=min(dumi(i,k),5.e-3_r8)
-       ! limit in-precip mixing ratios
-       dumr(i,k)=min(dumr(i,k),10.e-3_r8)
-       dums(i,k)=min(dums(i,k),10.e-3_r8)
-       dumg(i,k)=min(dumg(i,k),10.e-3_r8)
+        ! limit in-cloud mixing ratio to reasonable value of 5 g kg-1
+        dumc(i,k)=min(dumc(i,k),5.e-3_r8)
+        dumi(i,k)=min(dumi(i,k),5.e-3_r8)
+        ! limit in-precip mixing ratios
+        dumr(i,k)=min(dumr(i,k),10.e-3_r8)
+        dums(i,k)=min(dums(i,k),10.e-3_r8)
+        dumg(i,k)=min(dumg(i,k),10.e-3_r8)
 
-       ! cloud ice effective radius
-       !-----------------------------------------------------------------
+        ! cloud ice effective radius
+        !-----------------------------------------------------------------
      
-       if (do_cldice) then
+        if (do_cldice) then
 
-           dum_2D(i,k) = dumni(i,k)
+            dum_2D(i,k) = dumni(i,k)
 
-           call size_dist_param_basic(mg_ice_props, dumi(i,k), dumni(i,k), lami(i,k), n0=dumni0A2D(i,k))
+            call size_dist_param_basic(mg_ice_props, dumi(i,k), dumni(i,k), lami(i,k), n0=dumni0A2D(i,k))
 
-           if (dumi(i,k).ge.qsmall) then
-              if (dumni(i,k) /= dum_2D(i,k)) then
-                 ! adjust number conc if needed to keep mean size in reasonable range
-                 nitend(i,k)=(dumni(i,k)*icldm(i,k)-ni(i,k))*rdeltat
-              end if
-              effi(i,k) = 1.5_r8/lami(i,k)*1.e6_r8
-              sadice(i,k) = 2._r8*pi*(lami(i,k)**(-3))*dumni0A2D(i,k)*rho(i,k)*1.e-2_r8  ! m2/m3 -> cm2/cm3
-           else
-              effi(i,k) = 25._r8
-              sadice(i,k) = 0._r8
-           end if
+            if (dumi(i,k).ge.qsmall) then
+               if (dumni(i,k) /= dum_2D(i,k)) then
+                  ! adjust number conc if needed to keep mean size in reasonable range
+                  nitend(i,k)=(dumni(i,k)*icldm(i,k)-ni(i,k))*rdeltat
+               end if
+               effi(i,k) = 1.5_r8/lami(i,k)*1.e6_r8
+               sadice(i,k) = 2._r8*pi*(lami(i,k)**(-3))*dumni0A2D(i,k)*rho(i,k)*1.e-2_r8  ! m2/m3 -> cm2/cm3
+            else
+               effi(i,k) = 25._r8
+               sadice(i,k) = 0._r8
+            end if
 
-           ! ice effective diameter for david mitchell's optics
-           deffi(i,k)=effi(i,k)*rhoi/rhows*2._r8
+            ! ice effective diameter for david mitchell's optics
+            deffi(i,k)=effi(i,k)*rhoi/rhows*2._r8
 
-       else
+        else
 
-           ! NOTE: If CARMA is doing the ice microphysics, then the ice effective
-           ! radius has already been determined from the size distribution.
-           effi(i,k) = re_ice(i,k) * 1.e6_r8      ! m -> um
-           deffi(i,k)=effi(i,k) * 2._r8
-           sadice(i,k) = 4._r8*pi*(effi(i,k)**2)*ni(i,k)*rho(i,k)*1e-2_r8
-       end if
+            ! NOTE: If CARMA is doing the ice microphysics, then the ice effective
+            ! radius has already been determined from the size distribution.
+            effi(i,k) = re_ice(i,k) * 1.e6_r8      ! m -> um
+            deffi(i,k)=effi(i,k) * 2._r8
+            sadice(i,k) = 4._r8*pi*(effi(i,k)**2)*ni(i,k)*rho(i,k)*1e-2_r8
+        end if
 
-       ! cloud droplet effective radius
-       !-----------------------------------------------------------------
-       dum_2D(i,k) = dumnc(i,k)
+        ! cloud droplet effective radius
+        !-----------------------------------------------------------------
+        dum_2D(i,k) = dumnc(i,k)
 
-     end do
-  end do
-  !$acc end parallel
+        call size_dist_param_liq(mg_liq_props, dumc(i,k), dumnc(i,k), &
+                                 rho(i,k), pgam(i,k), lamc(i,k))
 
-  call size_dist_param_liq_vect(mg_liq_props, dumc, dumnc, rho, pgam, lamc, mgncol*nlev)
-
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-     do i=1,mgncol
         if (dumc(i,k).ge.qsmall) then
 
            ! switch for specification of droplet and crystal number
@@ -3027,22 +3009,12 @@ subroutine micro_mg_tend ( &
            dumnc(i,k)=1.e8_r8
 
         end if
-     end do
-  end do
-  !$acc end parallel
 
-  !!call t_stopf ('micro_mg3_misc')
+        ! Pass in "false" adjust flag to prevent number from being changed within
+        ! size distribution subroutine.
+        call size_dist_param_liq(mg_liq_props, dumc(i,k), dumnc(i,k), &
+                                 rho(i,k), pgam(i,k), lamc(i,k))
 
-  !!call t_startf ('micro_mg3_size_dist_param_liq_vect')
-
-  ! Pass in "false" adjust flag to prevent number from being changed within
-  ! size distribution subroutine.
-  call size_dist_param_liq_vect(mg_liq_props, dumc, dumnc, rho, pgam, lamc, mgncol*nlev)
-
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector collapse(2)
-  do k =1,nlev
-     do i=1,mgncol
         if (dumc(i,k).ge.qsmall) then
            effc_fn(i,k) = (pgam(i,k)+3._r8)/lamc(i,k)/2._r8*1.e6_r8
         else
