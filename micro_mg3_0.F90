@@ -1544,31 +1544,26 @@ subroutine micro_mg_tend ( &
         gflx(i,k)=0._r8
      end do
   end do
-  !$acc end parallel
 
-  !ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-  ! get size distribution parameters based on in-cloud cloud water
-  ! these calculations also ensure consistency between number and mixing ratio
-  !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-
-  ! cloud liquid
-  !-------------------------------------------
-
-  !!call t_startf ('micro_mg3_size_dist_param_liq_vect')
-
-  call size_dist_param_liq_vect(mg_liq_props, qcic, ncic, rho, pgam, lamc, mgncol*nlev)
-
-  !!call t_stopf ('micro_mg3_size_dist_param_liq_vect')
-
-  !========================================================================
-  ! autoconversion of cloud liquid water to rain
-  ! formula from Khrouditnov and Kogan (2000), modified for sub-grid distribution of qc
-  ! minimum qc of 1 x 10^-8 prevents floating point error
-
-  !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2)
   do k=1,nlev
      do i=1,mgncol
+
+        !ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+        ! get size distribution parameters based on in-cloud cloud water
+        ! these calculations also ensure consistency between number and mixing ratio
+        !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+      
+        ! cloud liquid
+        !-------------------------------------------
+      
+        call size_dist_param_liq(mg_liq_props, qcic(i,k), ncic(i,k), rho(i,k), pgam(i,k), lamc(i,k))
+
+        !========================================================================
+        ! autoconversion of cloud liquid water to rain
+        ! formula from Khrouditnov and Kogan (2000), modified for sub-grid distribution of qc
+        ! minimum qc of 1 x 10^-8 prevents floating point error
+
         if (.not. do_sb_physics) then
            call kk2000_liq_autoconversion(microp_uniform, qcic(i,k), ncic(i,k), rho(i,k), relvar(i,k), prc(i,k), nprc(i,k), nprc1(i,k), 1)
         endif
