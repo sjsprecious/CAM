@@ -984,12 +984,15 @@ end subroutine var_coef_integer_vect
 ! Run before the main loop
 ! This subroutine written by Peter Caldwell
 
-subroutine ice_deposition_sublimation(t, qv, qi, ni, &
+subroutine ice_deposition_sublimation(props, t, qv, qi, ni, &
                                       icldm, rho, dv,qvl, qvi, &
                                       berg, vap_dep, ice_sublim, vlen)
 
+!$acc routine seq
+
   !INPUT VARS:
   !===============================================
+  type(MGHydrometeorProps),  intent(in) :: props
   integer,  intent(in) :: vlen 
   real(r8), dimension(vlen), intent(in) :: t
   real(r8), dimension(vlen), intent(in) :: qv
@@ -1017,14 +1020,12 @@ subroutine ice_deposition_sublimation(t, qv, qi, ni, &
   real(r8) :: n0i(vlen)
   integer :: i
 
-  !$acc data present (t,qv,qi,ni,icldm,rho,dv,qvl) &
-  !$acc      present (qvi,vap_dep,ice_sublim,berg) &
+  !$acc data present (props,t,qv,qi,ni,icldm,rho,dv) &
+  !$acc      present (qvl,qvi,vap_dep,ice_sublim,berg) &
   !$acc      create  (ab,qiic,niic,lami,n0i)
 
   !GET IN-CLOUD qi, ni
   !===============================================
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector
   do i = 1,vlen
      if (qi(i)>=qsmall) then
         qiic(i) = qi(i)/icldm(i)
@@ -1032,17 +1033,11 @@ subroutine ice_deposition_sublimation(t, qv, qi, ni, &
         !Compute linearized condensational heating correction
         call calc_ab(t(i), qvi(i), xxls, ab(i))
      end if
+
+     !Get slope and intercept of gamma distn for ice.
+     call size_dist_param_basic(props, qiic(i), niic(i), lami(i), n0i(i))
   end do
-  !$acc end parallel
 
-  !Compute linearized condensational heating correction
-!  call calc_ab(t, qvi, xxls, ab, vlen)
-
-  !Get slope and intercept of gamma distn for ice.
-  call size_dist_param_basic_vect(mg_ice_props, qiic, niic, lami, vlen, n0i)
-
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector private(epsi)
   do i=1,vlen
      if (qi(i)>=qsmall) then
 
@@ -1079,7 +1074,6 @@ subroutine ice_deposition_sublimation(t, qv, qi, ni, &
         ice_sublim(i)=0._r8
      end if !qi>qsmall
   end do
-  !$acc end parallel
 
   !$acc end data
 end subroutine ice_deposition_sublimation

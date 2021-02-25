@@ -1801,20 +1801,12 @@ subroutine micro_mg_tend ( &
 
         bergs(i,k)=bergs(i,k)*micro_mg_berg_eff_factor
 
-     end do
-  end do
-  !$acc end parallel
+        if (do_cldice) then
 
-  if (do_cldice) then
+           call ice_deposition_sublimation(mg_ice_props, t(i,k), q(i,k), qi(i,k), ni(i,k), &
+                                           icldm(i,k), rho(i,k), dv(i,k), qvl(i,k), qvi(i,k), &
+                                           berg(i,k), vap_dep(i,k), ice_sublim(i,k), 1)
 
-     call ice_deposition_sublimation(t, q, qi, ni, &
-          icldm, rho, dv, qvl, qvi, &
-          berg, vap_dep, ice_sublim, mgncol*nlev)
-
-     !$acc parallel vector_length(VLEN) default(present)
-     !$acc loop gang vector collapse(2)
-     do k=1,nlev
-        do i=1,mgncol
            berg(i,k)=berg(i,k)*micro_mg_berg_eff_factor
            
            if (ice_sublim(i,k) < 0._r8 .and. qi(i,k) > qsmall .and. icldm(i,k) > mincld) then
@@ -1828,15 +1820,14 @@ subroutine micro_mg_tend ( &
            !in fact, nothing in this entire file makes nsubc nonzero.
            nsubc(i,k) = 0._r8
 
-        end do
-     end do
-     !$acc end parallel
+        end if !do_cldice
 
-  end if !do_cldice
+     end do
+  end do
+  !$acc end parallel
 
 ! Process rate calls for graupel   
 !===================================================================
-
 
   !$acc parallel vector_length(VLEN) default(present)
   !$acc loop gang vector collapse(2)
