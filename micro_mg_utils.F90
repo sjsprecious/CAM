@@ -256,10 +256,12 @@ real(r8) :: gamma_half_bs_plus5
 real(r8) :: gamma_2bs_plus2
 
 integer, parameter :: max_vlen = pcols*pver
+real(r8), public   :: cons_graupel_collecting_cld_water
 
 !$acc declare create (rv,cpp,tmelt,xxlv,xxls,ra, &
 !$acc                 gamma_bs_plus3,gamma_half_br_plus5, &
-!$acc                 gamma_half_bs_plus5,gamma_2bs_plus2)
+!$acc                 gamma_half_bs_plus5,gamma_2bs_plus2, &
+!$acc                 cons_graupel_collecting_cld_water)
 
 !=========================================================
 ! Utilities that are cheaper if the compiler knows that
@@ -1932,6 +1934,8 @@ subroutine evaporate_sublimate_precip(t, rho, dv, mu, sc, q, qvl, qvi, &
      lcldm, precip_frac, arn, asn, qcic, qiic, qric, qsic, lamr, n0r, lams, n0s, &
      pre, prds, am_evp_st, vlen)
 
+!$acc routine seq
+
   integer,  intent(in) :: vlen
 
   real(r8), dimension(vlen), intent(in) :: t    ! temperature
@@ -1984,8 +1988,6 @@ subroutine evaporate_sublimate_precip(t, rho, dv, mu, sc, q, qvl, qvi, &
   ! this will ensure that evaporation/sublimation of precip occurs over
   ! entire grid cell, since min cloud fraction is specified otherwise
 
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector
   do i=1,vlen
      am_evp_st(i) = 0._r8
      if (qcic(i)+qiic(i) < 1.e-6_r8) then
@@ -1995,7 +1997,6 @@ subroutine evaporate_sublimate_precip(t, rho, dv, mu, sc, q, qvl, qvi, &
      end if
   end do
 
-  !$acc loop gang vector private(qclr,eps,abr,ab)
   do i=1,vlen
   ! only calculate if there is some precip fraction > cloud fraction
 
@@ -2048,7 +2049,6 @@ subroutine evaporate_sublimate_precip(t, rho, dv, mu, sc, q, qvl, qvi, &
         pre(i) = 0._r8
      end if
   end do
-  !$acc end parallel
 
   !$acc end data
 end subroutine evaporate_sublimate_precip
@@ -2063,6 +2063,8 @@ end subroutine evaporate_sublimate_precip
 subroutine evaporate_sublimate_precip_graupel(t, rho, dv, mu, sc, q, qvl, qvi, &
      lcldm, precip_frac, arn, asn, agn, bg, qcic, qiic, qric, qsic, qgic, lamr, n0r, lams, n0s, lamg, n0g, &
      pre, prds, prdg, am_evp_st, vlen)
+
+!$acc routine seq
 
   integer,  intent(in) :: vlen
 
@@ -2081,7 +2083,7 @@ subroutine evaporate_sublimate_precip_graupel(t, rho, dv, mu, sc, q, qvl, qvi, &
   real(r8), dimension(vlen), intent(in) :: arn  ! rain
   real(r8), dimension(vlen), intent(in) :: asn  ! snow
   real(r8), dimension(vlen), intent(in) :: agn  ! graupel
-  real(r8),                    intent(in) :: bg 
+  real(r8),                  intent(in) :: bg 
 
   ! In-cloud MMRs
   real(r8), dimension(vlen), intent(in) :: qcic ! cloud liquid
@@ -2124,8 +2126,6 @@ subroutine evaporate_sublimate_precip_graupel(t, rho, dv, mu, sc, q, qvl, qvi, &
   ! this will ensure that evaporation/sublimation of precip occurs over
   ! entire grid cell, since min cloud fraction is specified otherwise
 
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector
   do i=1,vlen
      am_evp_st(i) = 0._r8
      if (qcic(i)+qiic(i) < 1.e-6_r8) then
@@ -2135,7 +2135,6 @@ subroutine evaporate_sublimate_precip_graupel(t, rho, dv, mu, sc, q, qvl, qvi, &
      end if
   end do
 
-  !$acc loop gang vector private(qclr,eps,abr,ab,abg)
   do i=1,vlen
      ! only calculate if there is some precip fraction > cloud fraction
      if (precip_frac(i) > dum(i)) then
@@ -2207,7 +2206,6 @@ subroutine evaporate_sublimate_precip_graupel(t, rho, dv, mu, sc, q, qvl, qvi, &
 
      end if
   end do
-  !$acc end parallel
 
   !$acc end data
 end subroutine evaporate_sublimate_precip_graupel
@@ -2334,6 +2332,8 @@ end subroutine graupel_collecting_snow
 subroutine graupel_collecting_cld_water(qgic,qcic,ncic,rho,n0g,lamg,bg,agn, &
      psacwg, npsacwg, vlen)
 
+!$acc routine seq
+
   integer, intent(in) :: vlen
 
   ! In-cloud MMRs
@@ -2357,23 +2357,19 @@ subroutine graupel_collecting_cld_water(qgic,qcic,ncic,rho,n0g,lamg,bg,agn, &
   real(r8), dimension(vlen), intent(out) :: psacwg
   real(r8), dimension(vlen), intent(out) :: npsacwg
 
-  real(r8) :: cons
   integer :: i 
 
-  !$acc data present (qgic,qcic,ncic,rho,lamg,n0g,agn,psacwg,npsacwg)
+  !$acc data present (qgic,qcic,ncic,rho,lamg,n0g,agn,psacwg,npsacwg) &
+  !$acc      present (cons_graupel_collecting_cld_water)
 
-  cons = gamma(bg + 3._r8)*pi/4._r8 * ecid
-
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector
   do i=1,vlen
 
      if (qgic(i).ge.1.e-8_r8 .and. qcic(i).ge.qsmall) then
 
-        psacwg(i) = cons*agn(i)*qcic(i)*rho(i)*   &
+        psacwg(i) = cons_graupel_collecting_cld_water*agn(i)*qcic(i)*rho(i)*   &
                n0g(i)/                            &
                lamg(i)**(bg+3._r8)
-        npsacwg(i) = cons*agn(i)*ncic(i)*rho(i)*  &
+        npsacwg(i) = cons_graupel_collecting_cld_water*agn(i)*ncic(i)*rho(i)*  &
                n0g(i)/                            &
                lamg(i)**(bg+3._r8)
      else
@@ -2381,7 +2377,6 @@ subroutine graupel_collecting_cld_water(qgic,qcic,ncic,rho,n0g,lamg,bg,agn, &
         npsacwg(i)=0._r8
      end if
   end do
-  !$acc end parallel
 
   !$acc end data
 end subroutine graupel_collecting_cld_water
@@ -2647,7 +2642,7 @@ end subroutine graupel_rain_riming_snow
 subroutine graupel_rime_splintering(t,qcic,qric,qgic,psacwg,pracg,&
      qmultg,nmultg,qmultrg,nmultrg,vlen)
 
-!!!$acc routine seq
+!$acc routine seq
 
   integer, intent(in) :: vlen
   
@@ -2686,8 +2681,6 @@ subroutine graupel_rime_splintering(t,qcic,qric,qgic,psacwg,pracg,&
 !nmultg,qmultg                                                                             .
 !========================================================================
 
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector
   do i=1,vlen
 
      nmultrg(i)=0._r8
@@ -2747,7 +2740,6 @@ subroutine graupel_rime_splintering(t,qcic,qric,qgic,psacwg,pracg,&
         end if
      end if
   end do
-  !$acc end parallel
  
   !$acc end data
 end subroutine graupel_rime_splintering

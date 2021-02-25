@@ -143,7 +143,8 @@ use micro_mg_utils, only: &
      ah, bh, &
      rhog,rhoh, &
      mi0, &
-     rising_factorial
+     rising_factorial, &
+     cons_graupel_collecting_cld_water, ecid
 
 implicit none
 private
@@ -981,6 +982,8 @@ subroutine micro_mg_tend ( &
      bgtmp = bg
      rhogtmp = rhog
   end if
+  cons_graupel_collecting_cld_water = gamma(bgtmp + 3._r8)*pi/4._r8 * ecid
+  !$acc update device (cons_graupel_collecting_cld_water)
 
   mdust = size(rndst,3)
 
@@ -988,7 +991,7 @@ subroutine micro_mg_tend ( &
 !$acc               accre_enhan,p,pdel,cldn,liqcldf,icecldf,qsatfac,frzcnt,    &
 !$acc               naai,npccn,rndst,nacon,tnd_qsnow,tnd_nsnow,re_ice,frzdep,  &
 !$acc               mg_liq_props,mg_ice_props,mg_rain_props,mg_graupel_props,  &
-!$acc               mg_hail_props,mg_snow_props)                               &
+!$acc               mg_hail_props,mg_snow_props) &
 !$acc      copyout (qcsinksum_rate1ord,tlat,qvlat,qctend,qitend,nctend,rercld, &
 !$acc               nitend,qrtend,qstend,nrtend,nstend,bergstot,bergtot,effc,  &
 !$acc               effc_fn,effi,sadice,sadsnow,prect,preci,nevapr,evapsnow,   &
@@ -1494,8 +1497,6 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  call nvtxEndRange
-
   !$acc parallel vector_length(VLEN) default(present)
   if (precip_frac_method == MG_PRECIP_FRAC_INCLOUD) then
      !$acc loop seq
@@ -1822,26 +1823,17 @@ subroutine micro_mg_tend ( &
 
         end if !do_cldice
 
-     end do
-  end do
-  !$acc end parallel
-
 ! Process rate calls for graupel   
 !===================================================================
-
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector collapse(2)
-  do k=1,nlev
-     do i=1,mgncol
 
         if (do_hail.or.do_graupel) then
            call graupel_collecting_snow(qsic(i,k), qric(i,k), umr(i,k), ums(i,k), &
                                         rho(i,k), lamr(i,k), n0r(i,k), lams(i,k), &
                                         n0s(i,k), psacr(i,k), 1)
 
-!           call graupel_collecting_cld_water(qgic(i,k), qcic(i,k), ncic(i,k), rho(i,k), &
-!                                             n0g(i,k), lamg(i,k), bgtmp, agn(i,k), &
-!                                             psacwg(i,k), npsacwg(i,k), 1)
+           call graupel_collecting_cld_water(qgic(i,k), qcic(i,k), ncic(i,k), rho(i,k), &
+                                             n0g(i,k), lamg(i,k), bgtmp, agn(i,k), &
+                                             psacwg(i,k), npsacwg(i,k), 1)
 
            call graupel_riming_liquid_snow(psacws(i,k), qsic(i,k), qcic(i,k), nsic(i,k), &
                                            rho(i,k), rhosn, rhogtmp, asn(i,k), lams(i,k), &
@@ -1858,45 +1850,27 @@ subroutine micro_mg_tend ( &
                                          lams(i,k), n0r(i,k), lamr(i,k), deltat, &
                                          pgracs(i,k), ngracs(i,k), 1)
 
-!           call graupel_rime_splintering(t(i,k), qcic(i,k), qric(i,k), qgic(i,k), psacwg(i,k), &
-!                                         pracg(i,k), qmultg(i,k), nmultg(i,k), qmultrg(i,k), &
-!                                         nmultrg(i,k), 1)
+           call graupel_rime_splintering(t(i,k), qcic(i,k), qric(i,k), qgic(i,k), psacwg(i,k), &
+                                         pracg(i,k), qmultg(i,k), nmultg(i,k), qmultrg(i,k), &
+                                         nmultrg(i,k), 1)
 
-        end if
+           call evaporate_sublimate_precip_graupel(t(i,k), rho(i,k), dv(i,k), mu(i,k), sc(i,k), &
+                                                   q(i,k), qvl(i,k), qvi(i,k), lcldm(i,k), &
+                                                   precip_frac(i,k), arn(i,k), asn(i,k), agn(i,k), &
+                                                   bgtmp, qcic(i,k), qiic(i,k), qric(i,k), &
+                                                   qsic(i,k), qgic(i,k), lamr(i,k), n0r(i,k), &
+                                                   lams(i,k), n0s(i,k), lamg(i,k), n0g(i,k), &
+                                                   pre(i,k), prds(i,k), prdg(i,k), am_evp_st(i,k), 1)
 
-     end do
-  end do
-  !$acc end parallel
+        else
+           ! Routine without Graupel (original)        
+           call evaporate_sublimate_precip(t(i,k), rho(i,k), dv(i,k), mu(i,k), sc(i,k), q(i,k), qvl(i,k), &
+                                           qvi(i,k), lcldm(i,k), precip_frac(i,k), arn(i,k), asn(i,k), &
+                                           qcic(i,k), qiic(i,k), qric(i,k), qsic(i,k), lamr(i,k), n0r(i,k), &
+                                           lams(i,k), n0s(i,k), pre(i,k), prds(i,k), am_evp_st(i,k), 1)
 
-  if (do_hail.or.do_graupel) then
-    
-     call graupel_collecting_cld_water(qgic, qcic, ncic, rho, n0g, lamg, &
-                                       bgtmp, agn, psacwg, npsacwg, mgncol*nlev)
- 
-     call graupel_rime_splintering(t, qcic, qric, qgic, psacwg, pracg, qmultg, nmultg, qmultrg, nmultrg,mgncol*nlev)
+        end if  ! end do_graupel/hail loop
 
-     call evaporate_sublimate_precip_graupel(t, rho, dv, mu, sc, q, qvl, qvi, lcldm, precip_frac, arn, asn, agn, &
-                                             bgtmp, qcic, qiic, qric, qsic, qgic, lamr, n0r, lams, n0s, lamg, n0g, &
-                                             pre, prds, prdg, am_evp_st, mgncol*nlev) 
-
-     !!call t_stopf ('micro_mg3_evap_graupel')
-
-  else
-
-     !!call t_startf ('micro_mg3_evap_no_graupel')
-
-     ! Routine without Graupel (original)        
-     call evaporate_sublimate_precip(t, rho, dv, mu, sc, q, qvl, qvi, lcldm, precip_frac, arn, asn, qcic, qiic, &
-                                     qric, qsic, lamr, n0r, lams, n0s, pre, prds, am_evp_st, mgncol*nlev)
-
-     !!call t_stopf ('micro_mg3_evap_no_graupel')
-
-  end if ! end do_graupel/hail loop
-
-  !$acc parallel vector_length(VLEN) default(present)
-  !$acc loop gang vector collapse(2) private(dum,dum1,ratio,tmpfrz)
-  do k=1,nlev
-     do i=1,mgncol
         ! conservation to ensure no negative values of cloud water/precipitation
         ! in case microphysical process rates are large
         !===================================================================
@@ -3238,6 +3212,8 @@ subroutine micro_mg_tend ( &
      end do
   end do
   !$acc end parallel
+
+  call nvtxEndRange
 
 !$acc end data 
 
