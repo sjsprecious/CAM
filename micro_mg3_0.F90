@@ -1980,7 +1980,7 @@ subroutine micro_mg_tend ( &
            mnuccr(i,k)=mnuccr(i,k)*ratio
            mnuccri(i,k)=mnuccri(i,k)*ratio
         end if
-  
+
         ! conservation of rain number
         !-------------------------------------------------------------------
         ! Add evaporation of rain number.
@@ -2067,6 +2067,13 @@ subroutine micro_mg_tend ( &
            end if
            prds(i,k)=prds(i,k)*ratio
         end if
+
+     end do
+  end do
+
+  !$acc loop gang vector collapse(2)
+  do k=1,nlev
+     do i=1,mgncol
 
         ! conservation of snow number
         !-------------------------------------------------------------------
