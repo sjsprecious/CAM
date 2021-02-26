@@ -1027,7 +1027,7 @@ subroutine micro_mg_tend ( &
   call nvtxStartRange("mg3_compute", 3)
 
   ! Copies of input concentrations that may be changed internally.
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector collapse(2)
   do k = 1,nlev
      do i = 1,mgncol
@@ -1132,7 +1132,7 @@ subroutine micro_mg_tend ( &
 
   !!call t_stopf ('micro_mg3_qsat')
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector collapse(2)
   do k=1,nlev
      do i=1,mgncol
@@ -1602,7 +1602,7 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   if (precip_frac_method == MG_PRECIP_FRAC_INCLOUD) then
      !$acc loop seq
      do k=2,nlev
@@ -1661,7 +1661,7 @@ subroutine micro_mg_tend ( &
 
   !!call t_startf ('micro_mg3_misc')
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector collapse(2)
   do k=1,nlev
      do i=1,mgncol
@@ -1721,7 +1721,7 @@ subroutine micro_mg_tend ( &
 
      !!call t_startf ('micro_mg3_misc')
 
-     !$acc parallel vector_length(VLEN) default(present)
+     !$acc parallel vector_length(VLEN) default(present) async
      !$acc loop gang vector collapse(2)
      do k=1,nlev
         do i=1,mgncol
@@ -1740,7 +1740,7 @@ subroutine micro_mg_tend ( &
 
    !!call t_startf ('micro_mg3_misc')
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector collapse(2)
   do k=1,nlev
      do i=1,mgncol
@@ -1795,7 +1795,7 @@ subroutine micro_mg_tend ( &
 
   !!call t_startf ('micro_mg3_misc')
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector collapse(2)
   do k=1,nlev
      do i=1,mgncol
@@ -1825,7 +1825,7 @@ subroutine micro_mg_tend ( &
 
   !!call t_startf ('micro_mg3_misc')
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector collapse(2)
   do k=1,nlev
      do i=1,mgncol
@@ -1871,7 +1871,7 @@ subroutine micro_mg_tend ( &
 
   !!call t_startf ('micro_mg3_misc')
         
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector collapse(2)
   do k=1,nlev
      do i=1,mgncol
@@ -1907,7 +1907,7 @@ subroutine micro_mg_tend ( &
 
         !!call t_startf ('micro_mg3_misc')
 
-        !$acc parallel vector_length(VLEN) default(present)
+        !$acc parallel vector_length(VLEN) default(present) async
         !$acc loop gang vector collapse(2)
         do k=1,nlev
            do i=1,mgncol
@@ -1938,7 +1938,7 @@ subroutine micro_mg_tend ( &
 
         !!call t_startf ('micro_mg3_misc')
 
-        !$acc parallel vector_length(VLEN) default(present)
+        !$acc parallel vector_length(VLEN) default(present) async
         !$acc loop gang vector collapse(2)
         do k=1,nlev
            do i=1,mgncol
@@ -1973,7 +1973,7 @@ subroutine micro_mg_tend ( &
   else
      !!call t_startf ('micro_mg3_misc')
 
-     !$acc parallel vector_length(VLEN) default(present)
+     !$acc parallel vector_length(VLEN) default(present) async
      !$acc loop gang vector collapse(2)
      do k=1,nlev
         do i=1,mgncol
@@ -2012,7 +2012,7 @@ subroutine micro_mg_tend ( &
   else
      !!call t_startf ('micro_mg3_misc')
 
-     !$acc parallel vector_length(VLEN) default(present)
+     !$acc parallel vector_length(VLEN) default(present) async
      !$acc loop gang vector collapse(2)
      do k=1,nlev
         do i=1,mgncol
@@ -2067,7 +2067,7 @@ subroutine micro_mg_tend ( &
   else
      !!call t_startf ('micro_mg3_misc')
 
-     !$acc parallel vector_length(VLEN) default(present)
+     !$acc parallel vector_length(VLEN) default(present) async
      !$acc loop gang vector collapse(2)
      do k=1,nlev
         do i=1,mgncol
@@ -2088,7 +2088,7 @@ subroutine micro_mg_tend ( &
 
   !!call t_startf ('micro_mg3_misc')
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector collapse(2)
   do k=1,nlev
      do i=1,mgncol
@@ -2110,7 +2110,7 @@ subroutine micro_mg_tend ( &
 
      !!call t_startf ('micro_mg3_misc')
 
-     !$acc parallel vector_length(VLEN) default(present)
+     !$acc parallel vector_length(VLEN) default(present) async
      !$acc loop gang vector collapse(2)
      do k=1,nlev
         do i=1,mgncol
@@ -2178,7 +2178,7 @@ subroutine micro_mg_tend ( &
 
   end if ! end do_graupel/hail loop
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector collapse(2) private(dum,ratio)
   do k=1,nlev
      do i=1,mgncol
@@ -2501,7 +2501,7 @@ subroutine micro_mg_tend ( &
 
   !!call t_startf ('micro_mg3_misc')
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector collapse(2)
   do k=1,nlev
      do i=1,mgncol
@@ -2531,7 +2531,7 @@ subroutine micro_mg_tend ( &
 
   !!call t_startf ('micro_mg3_misc')
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector collapse(2) private(dum)
   do k=1,nlev
      do i=1,mgncol
@@ -2557,7 +2557,7 @@ subroutine micro_mg_tend ( &
 
   !!call t_stopf ('micro_mg3_qsat')
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector collapse(2) private(dum)
   do k=1,nlev
      do i=1,mgncol
@@ -2829,7 +2829,7 @@ subroutine micro_mg_tend ( &
 
   ! Re-apply droplet activation tendency
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector collapse(2)
   do k=1,nlev
      do i=1,mgncol
@@ -2929,7 +2929,7 @@ subroutine micro_mg_tend ( &
 
   !!call t_stopf ('micro_mg3_size_dist_param_liq_vect')
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector collapse(2) private(dum1,dum2,dum3,dum4)
   do k=1,nlev
      do i=1,mgncol
@@ -3013,7 +3013,7 @@ subroutine micro_mg_tend ( &
 
   !!call t_stopf ('micro_mg3_size_dist_param_basic_vect')
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector collapse(2)
   do k=1,nlev
      do i=1,mgncol
@@ -3129,7 +3129,7 @@ subroutine micro_mg_tend ( &
   ! get new update for variables that includes sedimentation tendency
   ! note : here dum variables are grid-average, NOT in-cloud
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector collapse(2)
   do k=1,nlev
      do i=1,mgncol
@@ -3245,7 +3245,7 @@ subroutine micro_mg_tend ( &
 
   !!call t_startf ('micro_mg3_misc')
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector collapse(2) private(dum,dum1)
   do k=1,nlev
      do i=1,mgncol
@@ -3300,7 +3300,7 @@ subroutine micro_mg_tend ( &
 
   if (do_cldice) then
 
-     !$acc parallel vector_length(VLEN) default(present)
+     !$acc parallel vector_length(VLEN) default(present) async
      !$acc loop gang vector collapse(2) private(dum)
      do k=1,nlev
         do i=1,mgncol
@@ -3396,7 +3396,7 @@ subroutine micro_mg_tend ( &
 
      !!call t_startf ('micro_mg3_misc')
 
-     !$acc parallel vector_length(VLEN) default(present)
+     !$acc parallel vector_length(VLEN) default(present) async
      !$acc loop gang vector collapse(2) private(dum,dum1)
      do k=1,nlev
         do i=1,mgncol
@@ -3446,7 +3446,7 @@ subroutine micro_mg_tend ( &
 
   !!call t_startf ('micro_mg3_misc')
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector collapse(2)
   do k=1,nlev
      do i=1,mgncol
@@ -3497,7 +3497,7 @@ subroutine micro_mg_tend ( &
 
      !!call t_startf ('micro_mg3_misc')
 
-     !$acc parallel vector_length(VLEN) default(present)
+     !$acc parallel vector_length(VLEN) default(present) async
      !$acc loop gang vector collapse(2)
      do k=1,nlev
         do i=1,mgncol
@@ -3516,7 +3516,7 @@ subroutine micro_mg_tend ( &
 
      !!call t_startf ('micro_mg3_misc')
 
-     !$acc parallel vector_length(VLEN) default(present)
+     !$acc parallel vector_length(VLEN) default(present) async
      !$acc loop gang vector collapse(2)
      do k=1,nlev
         do i=1,mgncol
@@ -3542,7 +3542,7 @@ subroutine micro_mg_tend ( &
   else
      !!call t_startf ('micro_mg3_misc')
 
-     !$acc parallel vector_length(VLEN) default(present)
+     !$acc parallel vector_length(VLEN) default(present) async
      !acc loop gang vector collapse(2)
      do k=1,nlev
         do i=1,mgncol
@@ -3562,7 +3562,7 @@ subroutine micro_mg_tend ( &
 
   ! cloud droplet effective radius
   !-----------------------------------------------------------------
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector collapse(2)
   do k=1,nlev
      do i=1,mgncol
@@ -3581,7 +3581,7 @@ subroutine micro_mg_tend ( &
 
   !!call t_startf ('micro_mg3_misc')
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector collapse(2)
   do k=1,nlev
      do i=1,mgncol
@@ -3627,7 +3627,7 @@ subroutine micro_mg_tend ( &
 
   !!call t_stopf ('micro_mg3_size_dist_param_liq_vect')
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector collapse(2)
   do k =1,nlev
      do i=1,mgncol
@@ -3659,7 +3659,7 @@ subroutine micro_mg_tend ( &
 
   !!call t_stopf ('micro_mg3_size_dist_param_basic_vect')
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector collapse(2)
   do k=1,nlev
      do i=1,mgncol
@@ -3689,7 +3689,7 @@ subroutine micro_mg_tend ( &
 
   !!call t_stopf ('micro_mg3_size_dist_param_basic_vect')
 
-  !$acc parallel vector_length(VLEN) default(present) 
+  !$acc parallel vector_length(VLEN) default(present) async 
   !$acc loop gang vector collapse(2)
   do k=1,nlev
      do i=1,mgncol
@@ -3725,7 +3725,7 @@ subroutine micro_mg_tend ( &
 
   !!call t_stopf ('micro_mg3_size_dist_param_basic_vect')
 
-  !$acc parallel vector_length(VLEN) default(present) 
+  !$acc parallel vector_length(VLEN) default(present) async 
   !$acc loop gang vector collapse(2)
   do k=1,nlev
      do i=1,mgncol
@@ -3787,7 +3787,7 @@ subroutine micro_mg_tend ( &
 
   !!call t_stopf ('micro_mg3_avg_diameter_vec')
 
-  !$acc parallel vector_length(VLEN) default(present) 
+  !$acc parallel vector_length(VLEN) default(present) async 
   !$acc loop gang vector collapse(2)
   do k=1,nlev
      do i=1,mgncol
@@ -3824,7 +3824,7 @@ subroutine micro_mg_tend ( &
 
   !!call t_stopf ('micro_mg3_avg_diameter_vec')
 
-  !$acc parallel vector_length(VLEN) default(present) 
+  !$acc parallel vector_length(VLEN) default(present) async 
   !$acc loop gang vector collapse(2)
   do k=1,nlev
      do i=1,mgncol
@@ -3863,7 +3863,7 @@ subroutine micro_mg_tend ( &
 
   !!call t_stopf ('micro_mg3_avg_diameter_vec')
 
-  !$acc parallel vector_length(VLEN) default(present) 
+  !$acc parallel vector_length(VLEN) default(present) async 
   !$acc loop gang vector collapse(2)
   do k=1,nlev
      do i=1,mgncol
@@ -4013,7 +4013,7 @@ subroutine calc_rercld(lamr, n0r, lamc, pgam, qric, qcic, ncic, rercld, vlen)
   !$acc data present (rercld,lamr,n0r,lamc,pgam,qric,qcic,ncic) &
   !$acc      create  (Atmp,tmp,pgamp1)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector
   do i=1,vlen
      pgamp1(i) = pgam(i)+1._r8
@@ -4022,7 +4022,7 @@ subroutine calc_rercld(lamr, n0r, lamc, pgam, qric, qcic, ncic, rercld, vlen)
 
   call rising_factorial(pgamp1, 2, tmp, vlen)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector
   do i=1,vlen
      ! Rain drops
@@ -4093,7 +4093,7 @@ subroutine Sedimentation(mgncol,nlev,do_cldice,deltat,fx,fnx,pdel_inv,qxtend,nxt
    !$acc      present (prect,xflx,xxlx,qxsevap,xcldm,tlat,qvlat,preci) &
    !$acc      create  (iters,rnstep,faltndx,faltndnx,faloutx,faloutnx,faltndqxe2,mask,dum1,dum_2D)
 
-   !$acc parallel vector_length(VLEN) default(present)
+   !$acc parallel vector_length(VLEN) default(present) async
    !$acc loop gang vector
    do k = 1, nlev
       do i = 1, mgncol
@@ -4102,7 +4102,7 @@ subroutine Sedimentation(mgncol,nlev,do_cldice,deltat,fx,fnx,pdel_inv,qxtend,nxt
    end do
    !$acc end parallel
 
-   !$acc parallel vector_length(VLEN) default(present)
+   !$acc parallel vector_length(VLEN) default(present) async
    !$acc loop gang vector private(n,k)
    do i = 1,mgncol
       iters(i)  = 1 + int( maxval( dum_2D(i,:) * deltat ) )
@@ -4201,6 +4201,8 @@ subroutine Sedimentation(mgncol,nlev,do_cldice,deltat,fx,fnx,pdel_inv,qxtend,nxt
 
    end do     ! i loop of 1, mgncol
    !$acc end parallel
+
+!$acc wait
 
    !$acc end data
 end subroutine Sedimentation

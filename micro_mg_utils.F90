@@ -412,7 +412,7 @@ subroutine rising_factorial_r8_vec(x, n, res,vlen)
   !$acc data present (x,res) &
   !$acc      create  (tmp)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector
   do i=1,vlen
      tmp(i) = x(i)+n
@@ -470,7 +470,7 @@ subroutine rising_factorial_integer_vec(x, n, res,vlen)
   !$acc data present (x,res) &
   !$acc      create  (factor)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector
   do i=1,vlen
      res(i)    = 1._r8
@@ -542,7 +542,7 @@ subroutine calc_ab_vect(t, qv, xxl, ab, vlen)
 
   !$acc data present (t,qv,xxl,ab)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector private(dqsdt)
   do i=1,vlen
      dqsdt = xxl*qv(i) / (rv * t(i)**2)
@@ -628,7 +628,7 @@ subroutine size_dist_param_liq_vect(props, qcic, ncic, rho, pgam, lamc, vlen)
   !$acc data present (props,qcic,ncic,rho,pgam,lamc) &
   !$acc      create  (tmp,pgamp1,shapeC,lbnd,ubnd)
 
-    !$acc parallel vector_length(VLEN) default(present)
+    !$acc parallel vector_length(VLEN) default(present) async
     !$acc loop gang vector
     do i=1,vlen
        if (qcic(i) > qsmall) then
@@ -650,7 +650,7 @@ subroutine size_dist_param_liq_vect(props, qcic, ncic, rho, pgam, lamc, vlen)
        call rising_factorial(pgamp1, props%eff_dim,tmp,vlen)
     end if
 
-    !$acc parallel vector_length(VLEN) default(present)
+    !$acc parallel vector_length(VLEN) default(present) async
     !$acc loop gang vector
     do i=1,vlen
        if (qcic(i) > qsmall) then
@@ -664,7 +664,7 @@ subroutine size_dist_param_liq_vect(props, qcic, ncic, rho, pgam, lamc, vlen)
 
     call size_dist_param_basic(props, qcic, ncic, shapeC, lbnd, ubnd, lamc, vlen)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector
   do i=1,vlen
      if (qcic(i) <= qsmall) then
@@ -745,7 +745,7 @@ subroutine size_dist_param_basic_vect(props, qic, nic, lam, vlen, n0)
   minMass   = props%min_mean_mass
   present_n0 = present(n0)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector 
   do i=1,vlen
 
@@ -808,7 +808,7 @@ subroutine size_dist_param_basic_vect2(props, qic, nic, shapeC,lbnd,ubnd, lam, v
 
   !$acc data present (props,qic,nic,shapeC,lbnd,ubnd,lam,n0)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector
   do i=1,vlen
 
@@ -877,7 +877,7 @@ subroutine avg_diameter_vec (q, n, rho_air, rho_sub, avg_diameter, vlen)
 
    !$acc data present (q,n,rho_air,avg_diameter)
 
-   !$acc parallel vector_length(VLEN) default(present)
+   !$acc parallel vector_length(VLEN) default(present) async
    !$acc loop gang vector
    do i=1,vlen
       avg_diameter(i) = (q(i)*rho_air(i)/(pi * rho_sub * n(i)))**(1._r8/3._r8)
@@ -919,7 +919,7 @@ subroutine var_coef_r8_vect(relvar, a, res, vlen)
   !$acc      create  (tmpA)
 
    call rising_factorial(relvar,a,tmpA,vlen)
-   !$acc parallel vector_length(VLEN) default(present)
+   !$acc parallel vector_length(VLEN) default(present) async
    !$acc loop gang vector
    do i=1,vlen
       res(i) = tmpA(i)/relvar(i)**a
@@ -961,7 +961,7 @@ subroutine var_coef_integer_vect(relvar, a, res, vlen)
   !$acc      create  (tmp)
 
   call rising_factorial(relvar, a,tmp,vlen)
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector
   do i=1,vlen
      res(i) = tmp(i) / relvar(i)**a
@@ -1018,7 +1018,7 @@ subroutine ice_deposition_sublimation(t, qv, qi, ni, &
 
   !GET IN-CLOUD qi, ni
   !===============================================
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector
   do i = 1,vlen
      if (qi(i)>=qsmall) then
@@ -1036,7 +1036,7 @@ subroutine ice_deposition_sublimation(t, qv, qi, ni, &
   !Get slope and intercept of gamma distn for ice.
   call size_dist_param_basic_vect(mg_ice_props, qiic, niic, lami, vlen, n0i)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector private(epsi)
   do i=1,vlen
      if (qi(i)>=qsmall) then
@@ -1110,7 +1110,7 @@ subroutine kk2000_liq_autoconversion(microp_uniform, qcic, &
   if (.not. microp_uniform) then
      call var_coef(relvar, 2.47_r8, prc_coef,vlen)
   else
-     !$acc parallel vector_length(VLEN) default(present)
+     !$acc parallel vector_length(VLEN) default(present) async
      !$acc loop gang vector
      do i = 1,vlen
         prc_coef(i) = 1._r8
@@ -1118,7 +1118,7 @@ subroutine kk2000_liq_autoconversion(microp_uniform, qcic, &
      !$acc end parallel
   end if
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector
   do i=1,vlen
      if (qcic(i) >= icsmall) then
@@ -1186,7 +1186,7 @@ subroutine sb2001v2_liq_autoconversion(pgam,qc,nc,qr,rho,relvar,au,nprc,nprc1,vl
   !$acc data present (pgam,qc,nc,qr,rho,relvar,au,nprc1,nprc) &
   !$acc      create  (dum,dum1,nu,pra_coef)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector private(dumi,nu,dum,dum1)
   do i=1,vlen
 
@@ -1251,7 +1251,7 @@ subroutine sb2001v2_accre_cld_water_rain(qc,nc,qr,rho,relvar,pra,npra,vlen)
   !$acc data present (qc,nc,qr,rho,relvar,pra,npra) &
   !$acc      create  (dum,dum1)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector private(dum,dum1)
   do i =1,vlen
 
@@ -1300,7 +1300,7 @@ subroutine ice_autoconversion(t, qiic, lami, n0i, dcs, prci, nprci, vlen)
   !$acc data present (t,qiic,lami,n0i,prci,nprci) &
   !$acc      create  (m_ip,d_rat)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector private(d_rat,m_ip)
   do i=1,vlen
      if (t(i) <= tmelt .and. qiic(i) >= qsmall) then
@@ -1367,7 +1367,7 @@ subroutine immersion_freezing(microp_uniform, t, pgam, lamc, &
   if (.not. microp_uniform) then
      call var_coef(relvar, 2, dum, vlen)
   else
-     !$acc parallel vector_length(VLEN) default(present)
+     !$acc parallel vector_length(VLEN) default(present) async
      !$acc loop gang vector
      do i =1,vlen
         dum(i) = 1._r8
@@ -1375,7 +1375,7 @@ subroutine immersion_freezing(microp_uniform, t, pgam, lamc, &
      !$acc end parallel
   end if
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector private(tmp)
   do i=1,vlen
 
@@ -1453,7 +1453,7 @@ subroutine contact_freezing (microp_uniform, t, p, rndst, nacon, &
   !$acc      present (qcic,ncic,relvar,mnucct,nnucct) &
   !$acc      create  (nslip,ndfaer)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector private(dum,dum1,tcnt,viscosity,mfp,contact_factor,tmp)
   do i = 1, vlen
 
@@ -1526,7 +1526,7 @@ subroutine snow_self_aggregation(t, rho, asn, rhosn, qsic, nsic, nsagg, vlen)
 
   !$acc data present (t,rho,asn,qsic,nsic,nsagg)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector
   do i=1,vlen
      if (qsic(i) >= qsmall .and. t(i) <= tmelt) then
@@ -1590,7 +1590,7 @@ subroutine accrete_cloud_water_snow(t, rho, asn, uns, mu, qcic, ncic, qsic, &
   !$acc data present (t,rho,asn,uns,mu,qcic,ncic,qsic) &
   !$acc      present (pgam,lamc,lams,n0s,psacws,npsacws)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector private(dc0,dum,eci,accrete_rate)
   do i=1,vlen
      if (qsic(i) >= qsmall .and. t(i) <= tmelt .and. qcic(i) >= qsmall) then
@@ -1641,7 +1641,7 @@ subroutine secondary_ice_production(t, psacws, msacwi, nsacwi, vlen)
 
   !$acc data present (t,psacws,msacwi,nsacwi)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector
   do i=1,vlen
      if((t(i) < 270.16_r8) .and. (t(i) >= 268.16_r8)) then
@@ -1711,7 +1711,7 @@ subroutine accrete_rain_snow(t, rho, umr, ums, unr, uns, qric, qsic, &
   !$acc data present (t,rho,umr,ums,unr,uns,qric,qsic) &
   !$acc      present (lamr,n0r,lams,n0s,pracs,npracs)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector private(common_factor,d_rat)
   do i=1,vlen
      if (qric(i) >= icsmall .and. qsic(i) >= icsmall .and. t(i) <= tmelt) then
@@ -1759,7 +1759,7 @@ subroutine heterogeneous_rain_freezing(t, qric, nric, lamr, mnuccr, nnuccr, vlen
 
   !$acc data present (t,qric,nric,lamr,mnuccr,nnuccr)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector
   do i=1,vlen
 
@@ -1814,14 +1814,14 @@ subroutine accrete_cloud_water_rain(microp_uniform, qric, qcic, &
 
   if (.not. microp_uniform) then
     call var_coef(relvar, 1.15_r8, pra_coef, vlen)
-    !$acc parallel vector_length(VLEN) default(present)
+    !$acc parallel vector_length(VLEN) default(present) async
     !$acc loop gang vector
     do i = 1, vlen
        pra_coef(i) = accre_enhan(i) * pra_coef(i)
     end do
     !$acc end parallel
   else
-    !$acc parallel vector_length(VLEN) default(present)
+    !$acc parallel vector_length(VLEN) default(present) async
     !$acc loop gang vector
     do i = 1, vlen
        pra_coef(i) = 1._r8
@@ -1829,7 +1829,7 @@ subroutine accrete_cloud_water_rain(microp_uniform, qric, qcic, &
     !$acc end parallel
   end if
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector
   do i=1,vlen
      if (qric(i) >= qsmall .and. qcic(i) >= qsmall) then
@@ -1866,7 +1866,7 @@ subroutine self_collection_rain(rho, qric, nric, nragg, vlen)
 
   !$acc data present (rho,qric,nric,nragg)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector
   do i=1,vlen
      if (qric(i) >= qsmall) then
@@ -1916,7 +1916,7 @@ subroutine accrete_cloud_ice_snow(t, rho, asn, qiic, niic, qsic, &
 
   !$acc data present (t,rho,asn,qiic,niic,qsic,lams,n0s,prai,nprai)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector private(accrete_rate)
   do i=1,vlen
      if (qsic(i) >= qsmall .and. qiic(i) >= qsmall .and. t(i) <= tmelt) then
@@ -1996,7 +1996,7 @@ subroutine evaporate_sublimate_precip(t, rho, dv, mu, sc, q, qvl, qvi, &
   ! this will ensure that evaporation/sublimation of precip occurs over
   ! entire grid cell, since min cloud fraction is specified otherwise
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector
   do i=1,vlen
      am_evp_st(i) = 0._r8
@@ -2136,7 +2136,7 @@ subroutine evaporate_sublimate_precip_graupel(t, rho, dv, mu, sc, q, qvl, qvi, &
   ! this will ensure that evaporation/sublimation of precip occurs over
   ! entire grid cell, since min cloud fraction is specified otherwise
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector
   do i=1,vlen
      am_evp_st(i) = 0._r8
@@ -2263,7 +2263,7 @@ subroutine bergeron_process_snow(t, rho, dv, mu, sc, qvl, qvi, asn, &
   !$acc data present (t,rho,dv,mu,sc,qvl,qvi) &
   !$acc      present (asn,qcic,qsic,lams,n0s,bergs)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector private(eps,ab)
   do i=1,vlen
      if (qsic(i) >= qsmall.and. qcic(i) >= qsmall .and. t(i) < tmelt) then
@@ -2320,7 +2320,7 @@ subroutine graupel_collecting_snow(qsic,qric,umr,ums,rho,lamr,n0r,lams,n0s, &
 
   cons31=pi*pi*ecr*rhosn
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector
   do i=1,vlen
 
@@ -2378,7 +2378,7 @@ subroutine graupel_collecting_cld_water(qgic,qcic,ncic,rho,n0g,lamg,bg,agn, &
 
   cons = gamma(bg + 3._r8)*pi/4._r8 * ecid
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector
   do i=1,vlen
 
@@ -2447,7 +2447,7 @@ subroutine graupel_riming_liquid_snow(psacws,qsic,qcic,nsic,rho,rhosn,rhog,asn,l
 
   cons  = 4._r8 *2._r8 *3._r8*rhosu*pi*ecid*ecid*gamma_2bs_plus2/(8._r8*(rhog-rhosn))
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector private(dum)
   do i=1,vlen
       
@@ -2532,7 +2532,7 @@ subroutine graupel_collecting_rain(qric,qgic,umg,umr,ung,unr,rho,n0r,lamr,n0g,la
   cons41=pi*pi*ecr*rhow
   cons32=pi/2._r8*ecr
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector private(dum)
   do i=1,vlen
 
@@ -2621,7 +2621,7 @@ subroutine graupel_rain_riming_snow(pracs,npracs,psacr,qsic,qric,nric,nsic,n0s,l
   cons18=rhosn*rhosn
   cons19=rhow*rhow
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector private(dum)
   do i=1,vlen
      
@@ -2701,7 +2701,7 @@ subroutine graupel_rime_splintering(t,qcic,qric,qgic,psacwg,pracg,&
 !nmultg,qmultg                                                                             .
 !========================================================================
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector private(fmult)
   do i=1,vlen
 
