@@ -3983,6 +3983,8 @@ subroutine micro_mg_tend ( &
 
   call nvtxEndRange
 
+!$acc wait
+
   call nvtxStartRange("mg3_data_copyout", 7)
 !$acc end data
   call nvtxEndRange
@@ -4201,8 +4203,6 @@ subroutine Sedimentation(mgncol,nlev,do_cldice,deltat,fx,fnx,pdel_inv,qxtend,nxt
 
    end do     ! i loop of 1, mgncol
    !$acc end parallel
-
-!$acc wait
 
    !$acc end data
 end subroutine Sedimentation
