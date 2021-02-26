@@ -220,7 +220,7 @@ subroutine  wv_sat_svp_to_qsat_vect(es, p, qs, vlen)
 
   !$acc data present (es,p,qs)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector
   do i=1,vlen
      if ( (p(i) - es(i)) <= 0._r8 ) then
@@ -288,7 +288,7 @@ subroutine wv_sat_qsat_water_vect(t, p, es, qs, vlen, idx)
   call wv_sat_svp_water_vect(t, es, vlen, idx)
   call wv_sat_svp_to_qsat_vect(es, p, qs, vlen)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector
   do i=1,vlen
      ! Ensures returned es is consistent with limiters on qs.
@@ -353,7 +353,7 @@ subroutine wv_sat_qsat_ice_vect(t, p, es, qs, vlen, idx)
   call wv_sat_svp_ice_vect(t, es, vlen, idx)
   call wv_sat_svp_to_qsat_vect(es, p, qs, vlen)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector
   do i=1,vlen
      ! Ensures returned es is consistent with limiters on qs.
@@ -596,7 +596,7 @@ subroutine GoffGratch_svp_water_vect(t, es, vlen)
 
   !$acc data present (t,es)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector
   do i=1,vlen
      es(i) = 10._r8**(-7.90298_r8*(tboil/t(i)-1._r8)+ &
@@ -637,7 +637,7 @@ subroutine GoffGratch_svp_ice_vect(t, es, vlen)
 
   !$acc data present (t,es)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector
   do i=1,vlen
      es(i) = 10._r8**(-9.09718_r8*(h2otrip/t(i)-1._r8)-3.56654_r8* &
@@ -680,7 +680,7 @@ subroutine MurphyKoop_svp_water_vect(t, es, vlen)
 
   !$acc data present (t,es)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector
   do i = 1, vlen
      es(i) = exp(54.842763_r8 - (6763.22_r8 / t(i)) - (4.210_r8 * log(t(i))) + &
@@ -720,7 +720,7 @@ subroutine MurphyKoop_svp_ice_vect(t, es, vlen)
 
   !$acc data present (t,es)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector
   do i = 1, vlen
      es(i) = exp(9.550426_r8 - (5723.265_r8 / t(i)) + (3.53068_r8 * log(t(i))) &
@@ -783,7 +783,7 @@ subroutine OldGoffGratch_svp_water_vect(t,es,vlen)
 
   !$acc data present (t,es)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector
   do i = 1, vlen
      ps(i) = 1013.246_r8
@@ -834,7 +834,7 @@ subroutine OldGoffGratch_svp_ice_vect(t,es,vlen)
   
   !$acc data present (t,es)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector
   do i = 1, vlen
      term1(i) = 2.01889049_r8/(tmelt/t(i))
@@ -888,7 +888,7 @@ subroutine Bolton_svp_water_vect(t, es,vlen)
 
   !$acc data present (t,es)
 
-  !$acc parallel vector_length(VLEN) default(present)
+  !$acc parallel vector_length(VLEN) default(present) async
   !$acc loop gang vector
   do i = 1, vlen
      es(i) = c1*exp( (c2*(t(i) - tmelt))/((t(i) - tmelt)+c3) )
