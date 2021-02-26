@@ -165,7 +165,7 @@
       <directive> --nodes={{ num_nodes }}</directive>
       <directive> --ntasks-per-node={{ tasks_per_node }}</directive>
       <directive> --output={{ job_id }}   </directive>
-      <directive> --exclusive                        </directive>
+      <directive> --exclusive             </directive>
     </directives>
   </batch_system>
 
@@ -255,6 +255,8 @@
     <directives>
       <directive> --ntasks={{ total_tasks }}</directive>
       <directive> --ntasks-per-node={{ tasks_per_node }}</directive>
+      <directive> --mem=700G </directive>
+      <directive> --reservation=TDD_4xV100 </directive>
     </directives>
     <queues>
       <queue nodemin="1" nodemax="20" default="true">dav</queue>
