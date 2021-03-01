@@ -504,8 +504,7 @@ subroutine micro_mg_tend ( &
        graupel_rime_splintering, &
        evaporate_sublimate_precip_graupel
 
-  ! use NVTX module to profile GPU codes
-  use nvtx_mod
+  use mpishorthand,     only: mpicom
 
   !Authors: Hugh Morrison, Andrew Gettelman, NCAR, Peter Caldwell, LLNL
   ! e-mail: morrison@ucar.edu, andrew@ucar.edu
@@ -941,6 +940,8 @@ subroutine micro_mg_tend ( &
   real(r8) :: irad
   real(r8) :: ifrac
 
+  integer  :: rank, ierror, file_id
+
   !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
 !$acc declare copyin (nccons,nicons,ngcons,ncnst,ninst,ngnst,dcs,g,r,rv,cpp,   &
@@ -985,7 +986,6 @@ subroutine micro_mg_tend ( &
 
   mdust = size(rndst,3)
 
-  call nvtxStartRange("mg3_data_create_copyin", 1)
 !$acc data copyin (t,q,qcn,qin,ncn,nin,qrn,qsn,nrn,nsn,qgr,ngr,relvar,frzimm, &
 !$acc              accre_enhan,p,pdel,cldn,liqcldf,icecldf,qsatfac,frzcnt,    &
 !$acc              naai,npccn,rndst,nacon,tnd_qsnow,tnd_nsnow,re_ice,frzdep,  &
@@ -1022,9 +1022,7 @@ subroutine micro_mg_tend ( &
 !$acc               pgam,prc,nprc,nprc1,pra,npra,prci,nprci,prai,nprai,pre,    &
 !$acc               prds,psacr,ncic,niic,nsic,nric,qiic,qsic,qric,dumi,dumni,  &
 !$acc               dumr,dumnr,dums,dumns,qtmpAI,qvnAI,dumc,dumnc,qcic)
-  call nvtxEndRange
 
-  call nvtxStartRange("mg3_compute", 3)
 
   ! Copies of input concentrations that may be changed internally.
   !$acc parallel vector_length(VLEN) default(present) async
@@ -3089,6 +3087,10 @@ subroutine micro_mg_tend ( &
 
   ! begin sedimentation
 
+  call mpi_comm_rank (mpicom, rank, ierror)
+  file_id = rank+100
+  write(file_id, *), "ice sedimentation, mpi rank = ", rank
+
   !!call t_startf ('micro_mg3_sedimentation_ice')
   ! ice
   call Sedimentation(mgncol,nlev,do_cldice,deltat,fi,fni,pdel_inv, &
@@ -3097,6 +3099,9 @@ subroutine micro_mg_tend ( &
                      xcldm=icldm,preci=preci)
   !!call t_stopf ('micro_mg3_sedimentation_ice')
 
+  file_id = rank+100
+  write(file_id, *), "liq sedimentation, mpi rank = ", rank
+
   !!call t_startf ('micro_mg3_sedimentation_liq')
   ! liq
   call Sedimentation(mgncol,nlev,.TRUE.,deltat,fc,fnc,pdel_inv, &
@@ -3104,17 +3109,26 @@ subroutine micro_mg_tend ( &
                      xxlx=xxlv,qxsevap=qcsevap,tlat=tlat,qvlat=qvlat,xcldm=lcldm)
   !!call t_stopf ('micro_mg3_sedimentation_liq')
 
+  file_id = rank+100
+  write(file_id, *), "rain sedimentation, mpi rank = ", rank
+
   !!call t_startf ('micro_mg3_sedimentation_rain')
   ! rain
   call Sedimentation(mgncol,nlev,.TRUE.,deltat,fr,fnr,pdel_inv, &
                      qrtend,nrtend,qrsedten,dumr,dumnr,prect,rflx)
   !!call t_stopf ('micro_mg3_sedimentation_rain')
 
+  file_id = rank+100
+  write(file_id, *), "snow sedimentation, mpi rank = ", rank
+
   !!call t_startf ('micro_mg3_sedimentation_snow')
   ! snow
   call Sedimentation(mgncol,nlev,.TRUE.,deltat,fs,fns,pdel_inv, &
                      qstend,nstend,qssedten,dums,dumns,prect,sflx,preci=preci)
   !!call t_stopf ('micro_mg3_sedimentation_snow')
+
+  file_id = rank+100
+  write(file_id, *), "graupel sedimentation, mpi rank = ", rank
 
   !!call t_startf ('micro_mg3_sedimentation_graupel')
   ! graupel
@@ -3981,13 +3995,10 @@ subroutine micro_mg_tend ( &
   end do
   !$acc end parallel
 
-  call nvtxEndRange
 
 !$acc wait
 
-  call nvtxStartRange("mg3_data_copyout", 7)
 !$acc end data
-  call nvtxEndRange
 
 end subroutine micro_mg_tend
 
@@ -4056,6 +4067,8 @@ end subroutine calc_rercld
 subroutine Sedimentation(mgncol,nlev,do_cldice,deltat,fx,fnx,pdel_inv,qxtend,nxtend, &
                          qxsedten,dumx,dumnx,prect,xflx,xxlx,qxsevap,xcldm,tlat,qvlat,preci)
 
+   use mpishorthand,     only: mpicom
+
    integer, intent(in)               :: mgncol,nlev
    logical, intent(in)               :: do_cldice
    real(r8),intent(in)               :: deltat
@@ -4082,11 +4095,16 @@ subroutine Sedimentation(mgncol,nlev,do_cldice,deltat,fx,fnx,pdel_inv,qxtend,nxt
    integer  :: iters(mgncol)
    logical  :: present_tlat,present_qvlat, present_xcldm,present_qxsevap, present_preci
 
+   integer  :: rank, ierror, file_id
+
    present_tlat    = present(tlat)
    present_qvlat   = present(qvlat)
    present_xcldm   = present(xcldm)
    present_qxsevap = present(qxsevap)
    present_preci   = present(preci)
+
+   call mpi_comm_rank (mpicom, rank, ierror)
+   file_id = rank+100
 
    ! loop over sedimentation sub-time step to ensure stability
    !==============================================================
@@ -4203,6 +4221,8 @@ subroutine Sedimentation(mgncol,nlev,do_cldice,deltat,fx,fnx,pdel_inv,qxtend,nxt
 
    end do     ! i loop of 1, mgncol
    !$acc end parallel
+
+   write(file_id, *), "maximum iter = ", maxval(iters(:))
 
    !$acc end data
 end subroutine Sedimentation
