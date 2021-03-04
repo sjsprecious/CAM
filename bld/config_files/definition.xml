@@ -192,7 +192,7 @@ Highest degree of the Legendre polynomials for m=0.
 <entry id="trk" value="1">
 Highest degree of the associated Legendre polynomials.
 </entry>
-<entry id="pcols" value="16">
+<entry id="pcols" value="384">
 Maximum number of columns in a chunk (physics data structure).
 </entry>
 <entry id="psubcols" value="1">
@@ -213,7 +213,7 @@ User specified C compiler options to append to Makefile defaults.
 <entry id="fc" value="">
 User specified Fortran compiler overrides Makefile default.
 </entry>
-<entry id="fc_type" valid_values="cray,pgi,intel,gnu,pathscale,ibm,nag" value="">
+<entry id="fc_type" valid_values="cray,pgi,intel,gnu,pathscale,ibm,nag,nvhpc" value="">
 Type of Fortran compiler.  Used when -fc specifies a generic wrapper script
 such as mpif90 or ftn.
 </entry>
