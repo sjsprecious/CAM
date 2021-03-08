@@ -93,13 +93,6 @@ subroutine cam_init( &
    use history_defaults, only: initialize_iop_history
 #endif
 
-#if defined(__OPENACC__)
-   use openacc
-   use cam_logfile,      only: iulog
-   use cam_abortutils,   only: endrun
-   use mpishorthand,     only: mpicom
-#endif
-
    ! Arguments
    character(len=cl), intent(in) :: caseid                ! case ID
    character(len=cl), intent(in) :: ctitle                ! case title
@@ -141,12 +134,6 @@ subroutine cam_init( &
    character(len=cs) :: filein      ! Input namelist filename
    !-----------------------------------------------------------------------
 
-#if defined(__OPENACC__)
-   ! temporary variables for MPI rank and device number information
-   integer  :: rank, ierror, num_dev, dev_id
-   character(len=10) :: rank_char
-#endif
-
    call init_pio_subsystem()
 
    ! Initializations using data passed from coupler.
@@ -175,24 +162,6 @@ subroutine cam_init( &
 
    ! Initialize grids and dynamics grid decomposition
    call dyn_grid_init()
-
-#if defined(__OPENACC__)
-   ! get current MPI rank
-   call mpi_comm_rank (mpicom, rank, ierror)
-   if (ierror /= 0) then
-      call endrun("Fail to get the MPI rank info inside the cam_init subroutine!")
-   end if
-   ! get available GPU device number 
-   num_dev = acc_get_num_devices( acc_device_default )
-   if (num_dev == 0) then
-      call endrun("Fail to find GPU on this node!")
-   end if
-   write(iulog, *) "MPI rank = ", rank, ", Number of GPU = ", num_dev
-   ! choose different GPUs for different MPI ranks
-   dev_id = mod(rank, num_dev)
-   call acc_set_device_num( dev_id, acc_device_default )
-   !$acc init device_num( dev_id )
-#endif
 
    ! Initialize physics grid decomposition
    call phys_grid_init()
@@ -236,23 +205,6 @@ subroutine cam_init( &
    call intht(model_doi_url)
 
    call cam_snapshot_deactivate()
-
-!!!#if defined(__OPENACC__)
-!!!   ! get local MPI rank
-!!!   call getenv("OMPI_COMM_WORLD_LOCAL_RANK", rank_char)
-!!!   ! get available GPU device number 
-!!!   num_dev = acc_get_num_devices( acc_device_default )
-!!!   if (num_dev == 0) then
-!!!      call endrun("Fail to find GPU on this node!")
-!!!   end if
-!!!   ! choose different GPUs for different MPI ranks
-!!!   read(rank_char,'(i)') rank
-!!!   dev_id = mod(rank, num_dev)
-!!!   !$acc set device_num ( dev_id )
-!!!   !$acc init device_num ( dev_id ) device_type ( acc_device_default )
-!!!   write(iulog, *) "MPI rank = ", rank, ", Number of GPU = ", num_dev, &
-!!!                   ", work on GPU ", dev_id
-!!!#endif
 
 end subroutine cam_init
 
